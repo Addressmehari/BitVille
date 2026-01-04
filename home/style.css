@@ -1,0 +1,24 @@
+:root {
+    --bg-color: #1a1a2e;
+    --stripe-color: #16213e;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: var(--bg-color);
+    font-family: 'Kalam', cursive;
+}
+
+#wall {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    cursor: grab;
+    /* Striped Background Pattern via CSS or Canvas? Canvas is better for zoom */
+}
+
+#wall:active {
+    cursor: grabbing;
+}
