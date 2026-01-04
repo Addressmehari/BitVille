@@ -1,0 +1,24 @@
+:root {
+    --bg-color: #42ae47;
+    /* Rich Grass Green */
+    /* Bright Grass Green */
+    /* Soft light blue-grey */
+}
+
+body,
+html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: var(--bg-color);
+    touch-action: none;
+    /* Prevent browser handling of touch gestures */
+}
+
+canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}

@@ -1,0 +1,89 @@
+[
+    {
+        "type": "activity_house",
+        "login": "Active_Session_1",
+        "x": 0,
+        "y": 0,
+        "username": "Active_Session_1",
+        "color": "#95ea7b",
+        "roofStyle": 1,
+        "doorStyle": 1,
+        "windowStyle": 2,
+        "chimneyStyle": 2,
+        "wallStyle": 3,
+        "has_terrace": false,
+        "facing": "down"
+    },
+    {
+        "type": "activity_house",
+        "login": "Active_Session_2",
+        "x": 3.0,
+        "y": -3.0,
+        "username": "Active_Session_2",
+        "color": "#4d7414",
+        "roofStyle": 0,
+        "doorStyle": 1,
+        "windowStyle": 3,
+        "chimneyStyle": 0,
+        "wallStyle": 1,
+        "has_terrace": false,
+        "facing": "left"
+    },
+    {
+        "type": "tree",
+        "x": 5.0,
+        "y": -3.0,
+        "obstacle": "tree",
+        "facing": "left"
+    },
+    {
+        "type": "tree",
+        "x": 7.0,
+        "y": -3.0,
+        "obstacle": "tree",
+        "facing": "left"
+    },
+    {
+        "type": "tree",
+        "x": 9.0,
+        "y": -3.0,
+        "obstacle": "tree",
+        "facing": "left"
+    },
+    {
+        "type": "tree",
+        "x": 3.0,
+        "y": -5.0,
+        "obstacle": "tree",
+        "facing": "left"
+    },
+    {
+        "type": "activity_house",
+        "login": "Active_Session_3",
+        "x": 5.0,
+        "y": -5.0,
+        "username": "Active_Session_3",
+        "color": "#d30abc",
+        "roofStyle": 1,
+        "doorStyle": 3,
+        "windowStyle": 0,
+        "chimneyStyle": 2,
+        "wallStyle": 3,
+        "has_terrace": false,
+        "facing": "left"
+    },
+    {
+        "type": "tree",
+        "x": 7.0,
+        "y": -5.0,
+        "obstacle": "tree",
+        "facing": "left"
+    },
+    {
+        "type": "tree",
+        "x": 9.0,
+        "y": -5.0,
+        "obstacle": "tree",
+        "facing": "left"
+    }
+]
