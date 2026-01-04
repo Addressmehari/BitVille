@@ -4,29 +4,44 @@ import threading
 import sys
 import os
 
-# Import your existing collector logic
-# Make sure data_collector.py allows importing DataCollector class without auto-running main!
-# We might need to tweak data_collector.py slightly to ensure strict class usage.
-# For now, we assume we can import it.
+import ctypes
+
+# Set AppUserModelID so notifications show "GitVille" instead of "Python"
+try:
+    myappid = 'gitville.activity.tracker.v1'
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+except Exception:
+    pass
+
 from data_collector import DataCollector
 
 def create_image():
-    # Generate an image for the icon (a simple colored circle)
+    # Draw a cute pixel-art style house icon
     width = 64
     height = 64
-    color1 = "black"
-    color2 = "#00A2E8"
-
-    image = Image.new('RGB', (width, height), color1)
+    image = Image.new('RGBA', (width, height), (0,0,0,0)) # Transparent bg
     dc = ImageDraw.Draw(image)
-    dc.ellipse((16, 16, 48, 48), fill=color2)
+    
+    # House Body (White/Cream)
+    dc.rectangle((16, 28, 48, 56), fill="#fdfbf7", outline="#2c3e50", width=2)
+    # Roof (Red)
+    dc.polygon([(10, 28), (32, 8), (54, 28)], fill="#e74c3c", outline="#c0392b", width=2)
+    # Door (Brown)
+    dc.rectangle((28, 40, 36, 56), fill="#8d6e63", outline="#5d4037", width=2)
+    # Window (Blue)
+    dc.rectangle((20, 34, 26, 40), fill="#74b9ff", outline="#2980b9", width=1)
+    dc.rectangle((38, 34, 44, 40), fill="#74b9ff", outline="#2980b9", width=1)
     
     return image
 
 class SystemTrayTracker:
     def __init__(self):
-        self.collector = DataCollector()
+        self.collector = DataCollector(on_reward=self.notify_reward)
         self.icon = None
+
+    def notify_reward(self, title, msg):
+        if self.icon:
+             self.icon.notify(msg, title)
 
     def on_quit(self, icon, item):
         print("Stopping collector...")

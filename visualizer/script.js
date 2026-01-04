@@ -116,6 +116,20 @@ async function init() {
     cloudSystem = new CloudSystem();
     // Init NPCs
     npcManager = new NPCManager(15);
+    
+    // Polling for World Updates (every 10 seconds)
+    setInterval(async () => {
+        try {
+            const worldRes = await fetch('world.json?t=' + Date.now());
+            if (worldRes.ok) {
+                const newConfig = await worldRes.json();
+                if (newConfig.timeOfDay !== worldConfig.timeOfDay || newConfig.weather !== worldConfig.weather) {
+                    console.log("World State Updated:", newConfig);
+                    worldConfig = newConfig;
+                }
+            }
+        } catch(e) { console.log("Polling failed", e); }
+    }, 10000);
 
     requestAnimationFrame(render);
 }

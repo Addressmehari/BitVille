@@ -41,8 +41,9 @@ def get_idle_duration():
 # Data Collector Class
 # -------------------------------------------------------------------------
 class DataCollector:
-    def __init__(self, filename="datas/activity_log.json"):
+    def __init__(self, filename="datas/activity_log.json", on_reward=None):
         self.filename = filename
+        self.on_reward = on_reward
         
         # In-memory metrics
         self.key_presses = 0
@@ -158,6 +159,12 @@ class DataCollector:
         except Exception as e:
             print(f"Error saving: {e}")
 
+    def get_random_house_name(self):
+        prefixes = ["Pixel", "Syntax", "Logic", "Binary", "Coder's", "Data", "Algorithm", "Memory", "Git", "Python", "Terminal", "Debug", "Loop", "Function", "Variable", "Cloud", "Server", "Script", "Byte", "Stack"]
+        suffixes = ["Cottage", "Station", "Loft", "Bungalow", "Cabin", "Den", "Abode", "Manor", "Garrison", "Palace", "Tower", "Dwelling", "Lodge", "Farm", "Villa", "Hut", "Keep", "Hub", "Base", "Outpost"]
+        import random
+        return f"{random.choice(prefixes)} {random.choice(suffixes)}"
+
     def check_rewards(self):
         """Checks if progress counters met thresholds"""
         rewards_triggered = False
@@ -176,11 +183,12 @@ class DataCollector:
         while self.progress_active_sec >= self.THRESHOLD_HOUSE:
             self.progress_active_sec -= self.THRESHOLD_HOUSE
             print(">>> REWARD: New House Earned!")
+            if self.on_reward: self.on_reward("New House Built! 🏠", "Your activity has constructed a new building in the city.")
             # Add House
-            count = len([h for h in houses if h.get('type') == 'activity_house'])
+            # count = len([h for h in houses if h.get('type') == 'activity_house'])
             houses.append({
                 "type": "activity_house",
-                "login": f"Active_Session_{count+1}",
+                "login": self.get_random_house_name(),
                 # Placeholder, will be fixed by recalculate
                 "x": 0, "y": 0 
             })
@@ -190,6 +198,7 @@ class DataCollector:
         while self.progress_idle_sec >= self.THRESHOLD_TREE:
             self.progress_idle_sec -= self.THRESHOLD_TREE
             print(">>> REWARD: New Tree Planted!")
+            if self.on_reward: self.on_reward("Tree Planted! 🌳", "Your idle time has grown a new tree.")
             houses.append({
                 "type": "tree",
                 "x": 0, "y": 0,
@@ -201,8 +210,9 @@ class DataCollector:
         while self.progress_keys >= self.THRESHOLD_UPGRADE:
             self.progress_keys -= self.THRESHOLD_UPGRADE
             print(">>> REWARD: House Upgrade Unlocked!")
+            if self.on_reward: self.on_reward("Upgrade Unlocked! ✨", "Your typing frenzy added a terrace to a house!")
             # Find a house without terrace
-            candidates = [h for h in houses if h.get('obstacle') != 'tree' and noth.get('has_terrace')]
+            candidates = [h for h in houses if h.get('obstacle') != 'tree' and not h.get('has_terrace')]
             if candidates:
                 # Pick random? Or first? Random is better
                 import random
@@ -281,6 +291,30 @@ class DataCollector:
             
         print(f"City Layout Updated: {len(processed)} entities.")
 
+    def update_world_state(self):
+        """Updates world.json with current time of day"""
+        world_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visualizer", "world.json")
+        try:
+            now = datetime.now()
+            hour = now.hour
+            # Simple logic: Night from 6 PM (18) to 6 AM (6)
+            is_night = hour < 6 or hour >= 18
+            time_of_day = "night" if is_night else "day"
+            
+            current_state = {}
+            if os.path.exists(world_path):
+                with open(world_path, 'r') as f:
+                    current_state = json.load(f)
+            
+            # Only save if changed to reduce IO
+            if current_state.get("timeOfDay") != time_of_day:
+                current_state["timeOfDay"] = time_of_day
+                with open(world_path, 'w') as f:
+                    json.dump(current_state, f, indent=4)
+                print(f"World state updated: {time_of_day}")
+        except Exception as e:
+            print(f"Error updating world state: {e}")
+
     def monitor_loop(self):
         """Checks idle status every second"""
         while self.running:
@@ -289,6 +323,12 @@ class DataCollector:
                 self.active_seconds += 1
             else:
                 self.idle_seconds += 1
+            
+            # Update world state logic less frequently? 
+            # Doing it every second is overkill but harmless for check.
+            # Writing only happens on change.
+            self.update_world_state()
+            
             time.sleep(1)
 
     def save_loop(self):
