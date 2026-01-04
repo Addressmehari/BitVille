@@ -1,4 +1,5 @@
 import os
+import json
 import threading
 try:
     import webview
@@ -37,18 +38,28 @@ def main():
         x = None
         y = None
     
+    # API Class for communication
+    class Api:
+        def get_data(self):
+            try:
+                with open('activity_log.json', 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                return {"error": str(e)}
+
     # Create the window directly
     webview.create_window(
         'My Visualizer', 
         file_url, 
-        width=width, 
-        height=height,
+        width=800, 
+        height=600,
         x=x,
-        y=y
+        y=y,
+        js_api=Api()
     )
     
     # Start the webview (blocking call)
-    webview.start()
+    webview.start(debug=True)
 
 if __name__ == "__main__":
     main()
