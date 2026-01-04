@@ -33,7 +33,7 @@ def main():
         resizable=True
     )
     
-    webview.start(debug=True)
+    webview.start(debug=False)
 
 if __name__ == "__main__":
     main()

@@ -8,11 +8,14 @@ let previousDataStr = "";
 let camera = { x: 0, y: 0, zoom: 1 };
 let isDragging = false;
 let lastMouse = { x: 0, y: 0 };
+let dragStart = { x: 0, y: 0 };
+let hasDragged = false;
 
 // Configuration
-const NOTE_WIDTH = 200;
-const NOTE_HEIGHT = 180;
-const PADDING = 20;
+const BASE_WIDTH = 220;
+const BASE_HEIGHT = 180;
+const EXPANDED_WIDTH = 300; // Wider when expanded
+const PADDING = 60; // More gap as requested
 
 const COLORS = [
     '#fef68a', // Yellow
@@ -35,29 +38,31 @@ resize();
 // --- Input Handling ---
 canvas.addEventListener('mousedown', e => {
     isDragging = true;
+    hasDragged = false;
     lastMouse = { x: e.clientX, y: e.clientY };
+    dragStart = { x: e.clientX, y: e.clientY };
     canvas.style.cursor = 'grabbing';
 });
 
-window.addEventListener('mouseup', () => {
+window.addEventListener('mouseup', e => {
     isDragging = false;
     canvas.style.cursor = 'grab';
+    
+    // Check for Click (if moved very little)
+    const dist = Math.hypot(e.clientX - dragStart.x, e.clientY - dragStart.y);
+    if (dist < 5) {
+        handleNoteClick(e.clientX, e.clientY);
+    }
 });
 
 window.addEventListener('mousemove', e => {
-    // Always track mouse for hover
     lastMouse = { x: e.clientX, y: e.clientY };
 
     if (isDragging) {
-        // Calculate delta (need previous frame mouse, or just use movementX/Y but that can be flaky)
-        // Let's use stored 'lastDragPos' or just offset from previous 'lastMouse'
-        // Wait, if we update lastMouse always, we need a 'dragStart' or 'prevMouse'
-        
-        // Actually simplest is:
+        hasDragged = true;
         camera.x += e.movementX;
         camera.y += e.movementY;
     }
-    draw();
 });
 
 canvas.addEventListener('wheel', e => {
@@ -68,7 +73,7 @@ canvas.addEventListener('wheel', e => {
     // Zoom towards mouse pointer logic
     const oldZoom = camera.zoom;
     let newZoom = oldZoom + delta;
-    newZoom = Math.max(0.1, Math.min(5.0, newZoom)); // Clamp zoom
+    newZoom = Math.max(0.5, Math.min(1, newZoom)); // Clamp zoom tighter (0.5x to 3x)
 
     const mouseX = e.clientX;
     const mouseY = e.clientY;
@@ -82,9 +87,41 @@ canvas.addEventListener('wheel', e => {
     // Adjust camera to keep world point under mouse
     camera.x = mouseX - wx * newZoom;
     camera.y = mouseY - wy * newZoom;
-    
-    draw();
 }, { passive: false });
+
+function handleNoteClick(screenX, screenY) {
+    // Convert to World Pos
+    const wx = (screenX - camera.x) / camera.zoom;
+    const wy = (screenY - camera.y) / camera.zoom;
+    
+    // Reverse Check (Top notes first)
+    // Actually our array is chronological, so later notes are drawn on top usually?
+    // Let's check all.
+    for (let i = notes.length - 1; i >= 0; i--) {
+        const n = notes[i];
+        // Simple AABB
+        if (wx > n.x && wx < n.x + n.w &&
+            wy > n.y && wy < n.y + n.h) {
+            
+            // Toggle Expand
+            n.expanded = !n.expanded;
+            
+            // Recalculate dimensions based on state
+            if (n.expanded) {
+                n.w = EXPANDED_WIDTH;
+                // Height depends on text
+                ctx.font = "24px 'Kalam', cursive";
+                const lines = wrapText(n.text, n.w - 40);
+                const textH = lines.length * 30;
+                n.h = Math.max(BASE_HEIGHT, textH + 80); // +Buffer for dates/pads
+            } else {
+                n.w = BASE_WIDTH;
+                n.h = BASE_HEIGHT;
+            }
+            return; // Click handled
+        }
+    }
+}
 
 // --- Data Fetching ---
 async function fetchData() {
@@ -97,25 +134,28 @@ async function fetchData() {
         if (jsonStr !== previousDataStr) {
             processNotes(rawData);
             previousDataStr = jsonStr;
-            draw();
         }
     } catch (e) { console.error(e); }
 }
 
 function processNotes(data) {
-    // Sort by timestamp if possible
+    // Sort by timestamp
     const sorted = [...data].sort((a, b) => {
         const t1 = a.timestamp ? new Date(a.timestamp).getTime() : 0;
         const t2 = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-        return t1 - t2; // Ascending order
+        return t1 - t2;
     });
 
+    // Reuse existing notes to preserve state (expanded, rotation) if ID matches?
+    // We don't have IDs. We'll map by index or content hash. 
+    // For simplicity, we rebuild but try to match properties if index matches.
+    
     notes = sorted.map((item, index) => {
-        // Deterministic Color
+        const existing = notes[index];
         const colorIdx = index % COLORS.length;
         
         let text = "";
-        let time = "";
+        let dateTime = "";
         
         if (typeof item === 'string') {
             text = item;
@@ -123,172 +163,212 @@ function processNotes(data) {
             text = item.answer || item.question || JSON.stringify(item);
             if (item.timestamp) {
                 const d = new Date(item.timestamp);
-                time = d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                // Full Date Time
+                dateTime = d.toLocaleString([], {
+                    month: 'short', day: 'numeric', 
+                    hour: '2-digit', minute:'2-digit'
+                });
             }
         }
         
-        // Layout Logic: Grid
-        // Columns based on arbitrary width? 
-        // Let's do a dynamic flow.
-        const cols = 5; // Fixed grid for now?
+        // Layout Logic: Flow with gaps
+        const cols = 4; // Fewer columns for more gaps
         const row = Math.floor(index / cols);
         const col = index % cols;
         
-        const x = 50 + col * (NOTE_WIDTH + PADDING);
-        const y = 50 + row * (NOTE_HEIGHT + PADDING);
+        const x = 80 + col * (BASE_WIDTH + PADDING); // More left margin
+        const y = 80 + row * (BASE_HEIGHT + PADDING);
 
-        return {
+        const n = {
             x, y,
-            w: NOTE_WIDTH,
-            h: NOTE_HEIGHT,
+            w: existing ? existing.w : BASE_WIDTH,
+            h: existing ? existing.h : BASE_HEIGHT,
             color: COLORS[colorIdx],
             text: text,
-            time: time,
-            rotation: (Math.random() - 0.5) * 6 // Random tilt +/- 3 deg
+            dateTime: dateTime,
+            rotation: existing ? existing.rotation : (Math.random() - 0.5) * 8,
+            expanded: existing ? existing.expanded : false,
+            anim: existing ? existing.anim : { scale: 1.0, lift: 0, blur: 15, offset: 8 }
         };
+        return n;
     });
+}
+
+function wrapText(text, maxWidth) {
+    const words = text.split(' ');
+    let lines = [];
+    let curLine = words[0];
+
+    for (let i = 1; i < words.length; i++) {
+        const width = ctx.measureText(curLine + " " + words[i]).width;
+        if (width < maxWidth) {
+            curLine += " " + words[i];
+        } else {
+            lines.push(curLine);
+            curLine = words[i];
+        }
+    }
+    lines.push(curLine);
+    return lines;
 }
 
 // --- Rendering ---
 function draw() {
     // Clear
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = "#1a1a2e"; // Darker BG
+    ctx.fillStyle = "#1e1e24"; // Charcoal Dark
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw Striped Wall Background
-    ctx.strokeStyle = "#16213e";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
+    // Dynamic BG: Dot Grid
+    ctx.fillStyle = "#2b2b36";
     const spacing = 40 * camera.zoom;
-    // Offset stripes by camera pan (modulo) to make it infinite
-    const offsetX = camera.x % spacing;
+    const ox = camera.x % spacing;
+    const oy = camera.y % spacing;
     
-    for (let x = offsetX; x < canvas.width; x += spacing) {
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
+    for (let x = ox; x < canvas.width; x += spacing) {
+        for (let y = oy; y < canvas.height; y += spacing) {
+            ctx.beginPath();
+            ctx.arc(x, y, 2 * camera.zoom, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
-    ctx.stroke();
 
-    // Camera Transform
     ctx.setTransform(camera.zoom, 0, 0, camera.zoom, camera.x, camera.y);
 
-    // Draw Notes
+    // --- Connections (Threads) ---
+    if (notes.length > 1) {
+        ctx.strokeStyle = "rgba(220, 220, 220, 0.4)"; // White thread
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]); // Dashed connection? Or solid for "Real"?
+        // User asked for "Real lines". Solid string looks better.
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        
+        for (let i = 0; i < notes.length - 1; i++) {
+            const curr = notes[i];
+            const next = notes[i+1];
+            
+            // Pin Point (Top Center)
+            const p1 = { x: curr.x + curr.w/2, y: curr.y + 10 };
+            const p2 = { x: next.x + next.w/2, y: next.y + 10 };
+            
+            // Draw curve (slack string)
+            ctx.moveTo(p1.x, p1.y);
+            // Control point hangs down
+            const midX = (p1.x + p2.x) / 2;
+            const midY = (p1.y + p2.y) / 2 + 50; // Droop
+            ctx.quadraticCurveTo(midX, midY, p2.x, p2.y);
+        }
+        ctx.stroke();
+    }
+
+    // --- Notes ---
     ctx.font = "20px 'Kalam', cursive";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
-    // Shadow settings
-    ctx.shadowColor = "rgba(0,0,0,0.5)"; // Darker shadow for dark mode
-    ctx.shadowBlur = 15;
-    ctx.shadowOffsetX = 8;
-    ctx.shadowOffsetY = 8;
-
     notes.forEach(note => {
-        // Calculate Hover Logic
+        // Hover Anim Logic
         const wx = (lastMouse.x - camera.x) / camera.zoom;
         const wy = (lastMouse.y - camera.y) / camera.zoom;
         
         let targetScale = 1.0;
-        let targetLift = 0;
-        let targetBlur = 15;
-        let targetOffset = 8;
-        
+        let targetBlur = 10;
+        let targetOffset = 5;
+        let zIndex = 0; // Fake z-index via array order, but scale helps visually
+
         if (wx > note.x && wx < note.x + note.w &&
             wy > note.y && wy < note.y + note.h) {
-            targetScale = 1.15; // Scale up more
-            targetLift = 15;
-            targetBlur = 35;
-            targetOffset = 20;
+            targetScale = 1.05;
+            targetBlur = 25;
+            targetOffset = 15;
+            zIndex = 1;
         }
-
-        // Initialize animation state if missing
-        if (!note.anim) {
-             note.anim = { scale: 1.0, lift: 0, blur: 15, offset: 8 };
-        }
-
-        // Smooth Lerp (Linear Interpolation)
-        // val = val + (target - val) * factor
-        const factor = 0.2; // Speed of transition
-        note.anim.scale += (targetScale - note.anim.scale) * factor;
-        note.anim.blur += (targetBlur - note.anim.blur) * factor;
-        note.anim.offset += (targetOffset - note.anim.offset) * factor;
-
-        // Apply Shadow based on anim state
-        ctx.shadowBlur = note.anim.blur;
-        ctx.shadowOffsetX = note.anim.offset;
-        ctx.shadowOffsetY = note.anim.offset;
+        
+        // Lerp
+        const f = 0.2;
+        note.anim.scale += (targetScale - note.anim.scale) * f;
+        note.anim.blur += (targetBlur - note.anim.blur) * f;
+        note.anim.offset += (targetOffset - note.anim.offset) * f;
 
         ctx.save();
         
+        // Transform
         const cx = note.x + note.w / 2;
         const cy = note.y + note.h / 2;
         
         ctx.translate(cx, cy);
         ctx.rotate(note.rotation * Math.PI / 180);
         ctx.scale(note.anim.scale, note.anim.scale);
-        
-        // Sticky Note Body
+
+        // Shadow
+        ctx.shadowColor = "rgba(0,0,0,0.6)";
+        ctx.shadowBlur = note.anim.blur;
+        ctx.shadowOffsetX = note.anim.offset;
+        ctx.shadowOffsetY = note.anim.offset;
+
+        // Note Body
         ctx.fillStyle = note.color;
-        
-        // Draw Note
         ctx.fillRect(-note.w/2, -note.h/2, note.w, note.h);
         
-        // Pin/Tape?
-        ctx.shadowColor = "transparent"; // Reset shadow for internal details
-        ctx.fillStyle = "rgba(255,255,255,0.4)";
-        ctx.fillRect(-20, -note.h/2 - 10, 40, 20); // Tape at top
+        // Reset Shadow for content
+        ctx.shadowColor = "transparent";
 
-        // Text
+        // Tape/Pin (Top Center)
+        ctx.fillStyle = "rgba(255,255,255,0.3)";
+        ctx.fillRect(-15, -note.h/2 - 5, 30, 20); // Tape
+        // Pin Head
+        ctx.fillStyle = "#e74c3c";
+        ctx.beginPath(); ctx.arc(0, -note.h/2 + 5, 4, 0, Math.PI*2); ctx.fill();
+
+        // Content
         ctx.fillStyle = "#1e293b";
         
-        // Timestamp (Top Right)
-        if (note.time) {
+        // Date/Time (Bottom Right now? Or Top?)
+        // User said "leave some gaps add a date and time"
+        // Let's put date at bottom right distinctively.
+        if (note.dateTime) {
             ctx.font = "14px 'Kalam', cursive";
             ctx.textAlign = "right";
-            ctx.fillText(note.time, note.w/2 - 10, -note.h/2 + 25);
+            ctx.fillStyle = "#4b5563";
+            ctx.fillText(note.dateTime, note.w/2 - 10, note.h/2 - 15);
         }
 
         // Main Text (Wrap)
         ctx.font = "24px 'Kalam', cursive";
         ctx.textAlign = "center";
+        ctx.fillStyle = "#1e293b";
         
-        const maxWidth = note.w - 30;
-        const words = note.text.split(' ');
-        let lines = [];
-        let curLine = words[0];
-
-        for (let i = 1; i < words.length; i++) {
-            const width = ctx.measureText(curLine + " " + words[i]).width;
-            if (width < maxWidth) {
-                curLine += " " + words[i];
-            } else {
-                lines.push(curLine);
-                curLine = words[i];
-            }
+        let displayLines = wrapText(note.text, note.w - 40);
+        
+        // Truncate if not expanded
+        if (!note.expanded && displayLines.length > 4) {
+             displayLines = displayLines.slice(0, 3);
+             displayLines.push("... (Click to read)");
         }
-        lines.push(curLine);
+        
+        // Calc startY to center
+        const lh = 30;
+        const totalH = displayLines.length * lh;
+        let startY = -totalH / 2;
+        
+        // Offset up slightly to make room for date
+        startY -= 10;
 
-        // Draw Lines centered vertically based on count
-        const lineHeight = 30;
-        const totalHeight = lines.length * lineHeight;
-        const startY = -totalHeight / 2 + 10; // offset slightly down
-
-        lines.forEach((line, i) => {
-            ctx.fillText(line, 0, startY + i * lineHeight);
+        displayLines.forEach((line, i) => {
+            ctx.fillText(line, 0, startY + i * lh);
         });
 
         ctx.restore();
     });
 }
 
-// --- Animation Loop ---
 function animate() {
     draw();
     requestAnimationFrame(animate);
 }
 
-// Start Poll
+// Start
 fetchData();
 setInterval(fetchData, 2000);
 animate();
