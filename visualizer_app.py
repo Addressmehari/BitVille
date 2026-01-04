@@ -47,6 +47,24 @@ def main():
             except Exception as e:
                 return {"error": str(e)}
 
+        def get_map(self):
+            if not os.path.exists('map.json'):
+                return {"entities": []}
+            try:
+                with open('map.json', 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"Error reading map: {e}")
+                return {"entities": []}
+
+        def save_map(self, data):
+            try:
+                with open('map.json', 'w') as f:
+                    json.dump(data, f, indent=4)
+                return {"status": "ok"}
+            except Exception as e:
+                return {"error": str(e)}
+
     # Create the window directly
     webview.create_window(
         'My Visualizer', 
