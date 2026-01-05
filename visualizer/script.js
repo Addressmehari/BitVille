@@ -812,6 +812,8 @@ function renderHouses() {
     for (const house of sortedHouses) {
         if (house.obstacle === 'tree') {
             drawTree(house.x, house.y, ctx);
+        } else if (house.type === 'git_post') {
+            drawGitHouse(house.x, house.y, house.hoverAnim, house.username, house.facing);
         } else {
             drawHouse(house.x, house.y, house.color, house.roofStyle, house.doorStyle, house.windowStyle, house.chimneyStyle, house.wallStyle, house.hoverAnim, house.username, house.abandoned, house.facing, house.has_terrace);
         }
@@ -2796,4 +2798,231 @@ function adjustColor(color, amount) {
 }
 
 // Start
+
+function drawGitHouse(gx, gy, hoverAnim, username, facing) {
+    const time = performance.now() * 0.002; // Global time for animation
+
+    const isoCenter = gridToWorld(gx, gy);
+    // Floating Animation (Bobbing) - Independent of hover
+    const floatOffset = Math.sin(time + gx + gy) * 3;
+    
+    // Hover Lift overlays on top of float
+    const lift = (hoverAnim || 0) * 8 + floatOffset + 4; 
+    
+    // Helper: Local ToScreen
+    function toScreen(lx, ly, lz) {
+        if (facing === 'right') { const t = lx; lx = ly; ly = t; }
+        const sx = isoCenter.x + (lx - ly);
+        const sy = isoCenter.y + (lx + ly) * 0.5 - lz - lift;
+        return { x: sx, y: sy };
+    }
+
+    const hw = 22, hd = 22;
+    const wh = 45, wh_back = 65; // Increased Height 
+    
+    // 1. Sci-Fi Base (Glowing Ring)
+    const baseScale = 1 + Math.sin(time * 2) * 0.05;
+    const sCenter = gridToWorld(gx, gy);
+    
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = "#00f3ff"; // Cyan Glow
+    ctx.fillStyle = "rgba(0, 243, 255, 0.2)";
+    ctx.beginPath();
+    ctx.ellipse(sCenter.x, sCenter.y, (hw * 1.6) * baseScale, (hd * 0.9) * baseScale, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0; // Reset
+
+    // 2. Holographic Walls (Glassy with Scanning Line)
+    const fl = toScreen(-hw, hd, 0), fr = toScreen(hw, hd, 0);
+    const bl = toScreen(-hw, -hd, 0), br = toScreen(hw, -hd, 0);
+    const fl_t = toScreen(-hw, hd, wh), fr_t = toScreen(hw, hd, wh);
+    const bl_t = toScreen(-hw, -hd, wh_back), br_t = toScreen(hw, -hd, wh_back); 
+
+    // Wall Style
+    ctx.fillStyle = "rgba(13, 17, 23, 0.9)"; // Dark semi-opaque
+    ctx.strokeStyle = "#00f3ff"; // Neon Cyan
+    ctx.lineWidth = 1.5;
+
+    // Right Wall (+X)
+    ctx.beginPath();
+    ctx.moveTo(fr.x, fr.y); ctx.lineTo(br.x, br.y); ctx.lineTo(br_t.x, br_t.y); ctx.lineTo(fr_t.x, fr_t.y);
+    ctx.fill();
+    // Neon Scanline Effect
+    ctx.save();
+    ctx.clip();
+    const scanH = (performance.now() * 0.05) % 100 - 20; // Moving up/down
+    ctx.fillStyle = "rgba(0, 243, 255, 0.1)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height); // Tint
+    // Draw scan line (approximated horizontal screen space for simplicity or calculated)
+    // Let's draw based on Z height scan?
+    // Just simple overlay line
+    ctx.strokeStyle = "rgba(0, 243, 255, 0.5)";
+    ctx.lineWidth = 2;
+    // ... Actually simple gradient fill is better for "Hologram"
+    const grad = ctx.createLinearGradient(0, br_t.y, 0, br.y);
+    grad.addColorStop(0, "rgba(0, 243, 255, 0.1)");
+    grad.addColorStop(0.5, "rgba(0, 243, 255, 0.0)");
+    grad.addColorStop(1, "rgba(0, 243, 255, 0.1)");
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.restore();
+    // Border
+    ctx.shadowBlur = 10; ctx.shadowColor = "#00f3ff";
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+
+    // Front Wall (+Y)
+    ctx.beginPath();
+    ctx.moveTo(fl.x, fl.y); ctx.lineTo(fr.x, fr.y); ctx.lineTo(fr_t.x, fr_t.y); ctx.lineTo(fl_t.x, fl_t.y);
+    ctx.fillStyle = "rgba(13, 17, 23, 0.95)";
+    ctx.fill();
+    ctx.strokeStyle = "#00f3ff";
+    ctx.stroke();
+
+    // 3. Roof (Animated Matrix)
+    const oh = 0; // Seamless
+    const r_fl = toScreen(-hw-oh, hd+oh, wh);
+    const r_fr = toScreen(hw+oh, hd+oh, wh);
+    const r_bl = toScreen(-hw-oh, -hd-oh, wh_back);
+    const r_br = toScreen(hw+oh, -hd-oh, wh_back);
+
+    // Thickness (Tech style)
+    ctx.fillStyle = "#1b212c";
+    ctx.beginPath(); ctx.moveTo(r_fr.x, r_fr.y); ctx.lineTo(r_br.x, r_br.y); ctx.lineTo(r_br.x, r_br.y+4); ctx.lineTo(r_fr.x, r_fr.y+4); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(r_fl.x, r_fl.y); ctx.lineTo(r_fr.x, r_fr.y); ctx.lineTo(r_fr.x, r_fr.y+4); ctx.lineTo(r_fl.x, r_fl.y+4); ctx.fill();
+
+    // Surface
+    ctx.fillStyle = "#020408";
+    ctx.beginPath(); ctx.moveTo(r_fl.x, r_fl.y); ctx.lineTo(r_fr.x, r_fr.y); ctx.lineTo(r_br.x, r_br.y); ctx.lineTo(r_bl.x, r_bl.y); ctx.fill(); 
+    
+    // Animated Grid
+    const rows = 6, cols = 6; 
+    // Neon Green Palette
+    const colors = ["#003d19", "#00e152", "#9affc3"]; // Dark, Base, Bright
+    
+    const lerpRoof = (u, v) => {
+        const x1 = r_fl.x + (r_fr.x - r_fl.x) * u;
+        const y1 = r_fl.y + (r_fr.y - r_fl.y) * u;
+        const x2 = r_bl.x + (r_br.x - r_bl.x) * u;
+        const y2 = r_bl.y + (r_br.y - r_bl.y) * u;
+        return { x: x1 + (x2 - x1) * v, y: y1 + (y2 - y1) * v };
+    };
+
+    // Tech Corners
+    ctx.fillStyle = "#00e152";
+    for(let c=0; c<cols; c++) {
+        for(let r=0; r<rows; r++) {
+            // Wave Animation
+            const dist = Math.sqrt((c-cols/2)**2 + (r-rows/2)**2);
+            const val = Math.sin(dist - time * 4); // Ripple out
+            
+            // Only draw active peaks
+            if (val > 0.2) {
+                const intensity = (val - 0.2) / 0.8;
+                // Color ramp
+                let col = colors[0];
+                if (intensity > 0.5) col = colors[1];
+                if (intensity > 0.8) col = colors[2];
+                
+                ctx.fillStyle = col;
+                ctx.shadowBlur = intensity * 10;
+                ctx.shadowColor = col;
+
+                const u1 = (c+0.1)/cols, u2 = (c+0.9)/cols;
+                const v1 = (r+0.1)/rows, v2 = (r+0.9)/rows;
+                const p1 = lerpRoof(u1, v1), p2 = lerpRoof(u2, v1);
+                const p3 = lerpRoof(u2, v2), p4 = lerpRoof(u1, v2);
+                
+                ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.fill();
+            }
+        }
+    }
+    ctx.shadowBlur = 0; // Reset
+
+
+    // 5. Sci-Fi Portal Door
+    const dW = 14, dH = 32;
+    const dFrame = 2;
+    // Frame (Dark Metal)
+    ctx.fillStyle = "#1b212c"; 
+    const df1 = toScreen(-dW/2 - dFrame, hd+0.2, 0);
+    const df2 = toScreen(dW/2 + dFrame, hd+0.2, 0);
+    const df3 = toScreen(dW/2 + dFrame, hd+0.2, dH + dFrame);
+    const df4 = toScreen(-dW/2 - dFrame, hd+0.2, dH + dFrame);
+    
+    ctx.beginPath(); 
+    ctx.moveTo(df1.x, df1.y); ctx.lineTo(df2.x, df2.y); ctx.lineTo(df3.x, df3.y); ctx.lineTo(df4.x, df4.y); 
+    ctx.fill();
+    
+    // Inner Glow (Energy Field)
+    const pulse = Math.sin(time * 10) * 0.2 + 0.8;
+    ctx.fillStyle = `rgba(0, 243, 255, ${pulse * 0.6})`;
+    ctx.shadowColor = "#00f3ff"; ctx.shadowBlur = 15;
+    
+    // Chamfered Shape
+    const chamfer = 4;
+    const di1 = toScreen(-dW/2, hd+0.3, 0); // BL
+    const di2 = toScreen(dW/2, hd+0.3, 0);  // BR
+    const di3a = toScreen(dW/2, hd+0.3, dH - chamfer); // TR 1
+    const di3b = toScreen(dW/2 - chamfer, hd+0.3, dH); // TR 2
+    const di4a = toScreen(-dW/2 + chamfer, hd+0.3, dH); // TL 1
+    const di4b = toScreen(-dW/2, hd+0.3, dH - chamfer); // TL 2
+    
+    ctx.beginPath();
+    ctx.moveTo(di1.x, di1.y); 
+    ctx.lineTo(di2.x, di2.y);
+    ctx.lineTo(di3a.x, di3a.y);
+    ctx.lineTo(di3b.x, di3b.y);
+    ctx.lineTo(di4a.x, di4a.y);
+    ctx.lineTo(di4b.x, di4b.y);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Door Detail Lines
+    ctx.strokeStyle = "rgba(255,255,255,0.5)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const mid1 = toScreen(-dW/2 + 2, hd+0.3, dH/2);
+    const mid2 = toScreen(dW/2 - 2, hd+0.3, dH/2);
+    ctx.moveTo(mid1.x, mid1.y); ctx.lineTo(mid2.x, mid2.y);
+    ctx.stroke();
+
+    // 4. Data Streams (Floating Particles around house)
+    const streamH = 6;
+    ctx.fillStyle = "#00f3ff"; 
+    for(let i=0; i<4; i++) {
+        const tOffset = i * (Math.PI / 2);
+        const yPos = Math.sin(time + tOffset) * (wh/2) + wh/2;
+        // Orbit? No, just vertical floaters
+        // Let's simply draw small glowing bits
+        const bitP = toScreen((i%2===0?hw:-hw), (i<2?hd:-hd), yPos);
+        ctx.fillRect(bitP.x, bitP.y, 2, 2);
+    }
+
+    // 5. Tooltip (Cyber)
+    if(username && hoverAnim > 0.05) {
+        ctx.save();
+        const tipX = (r_fl.x + r_br.x)/2;
+        const tipY = Math.min(r_fl.y, r_br.y) - 15;
+        ctx.translate(tipX, tipY);
+        ctx.scale(hoverAnim, hoverAnim);
+        
+        ctx.font = "bold 12px 'Courier New', monospace";
+        const txt = "> " + username;
+        const w = ctx.measureText(txt).width + 20;
+        
+        ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+        ctx.strokeStyle = "#00e152";
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.roundRect(-w/2, -30, w, 24, 0); 
+        ctx.fill(); ctx.stroke();
+        
+        ctx.fillStyle = "#00e152"; 
+        ctx.shadowBlur = 5; ctx.shadowColor = "#00e152";
+        ctx.textAlign = "center"; ctx.fillText(txt, 0, -15);
+        ctx.restore();
+    }
+}
+
 init();

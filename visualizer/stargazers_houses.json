@@ -1,6 +1,6 @@
 [
     {
-        "type": "activity_house",
+        "type": "git_post",
         "login": "Memory Villa",
         "x": 0,
         "y": 0,
@@ -12,7 +12,7 @@
         "chimneyStyle": 2,
         "wallStyle": 3,
         "has_terrace": true,
-        "facing": "down"
+        "facing": "left"
     },
     {
         "type": "activity_house",
