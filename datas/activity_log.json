@@ -1,8 +1,14 @@
 {
-    "total_keys": 668,
-    "total_clicks": 145,
-    "total_active_seconds": 564,
-    "total_idle_seconds": 411,
-    "last_updated": "2026-01-05T13:31:23.771755",
-    "total_commits_detected": 0
+    "total_keys": 678,
+    "total_clicks": 150,
+    "total_active_seconds": 588,
+    "total_idle_seconds": 443,
+    "last_updated": "2026-01-05T13:40:57.685323",
+    "total_commits_detected": 0,
+    "last_git_event_id": "5599443107",
+    "progress_commits": 0,
+    "total_commits": 0,
+    "saved_progress_active": 24,
+    "saved_progress_idle": 32,
+    "saved_progress_keys": 10
 }
