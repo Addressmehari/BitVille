@@ -3,7 +3,6 @@ import json
 import time
 import threading
 from datetime import datetime
-import requests
 from pynput import keyboard, mouse
 import ctypes
 from ctypes import Structure, windll, c_uint, sizeof, byref
@@ -59,25 +58,12 @@ class DataCollector:
         # Progress Counters (Temporary, reset after reward)
         self.progress_active_sec = 0
         self.progress_idle_sec = 0
-        # Progress Counters (Temporary, reset after reward)
-        self.progress_active_sec = 0
-        self.progress_idle_sec = 0
         self.progress_keys = 0
-        
-        # GitHub Tracking
-        self.github_username = "addressmehari"
-        self.last_commit_id = None
-        self.commit_credits = 0 # 10 commits -> 1 House
-        self.total_commits_all_time = 0
-        
-        self.commit_credits = 0 # 1 commit -> 1 House
-        self.total_commits_all_time = 0
         
         # Thresholds (Reduced for Testing)
         self.THRESHOLD_HOUSE = 10       # 10 active seconds -> 1 House
         self.THRESHOLD_TREE = 10        # 10 idle seconds -> 1 Tree
         self.THRESHOLD_UPGRADE = 50     # 50 keys -> 1 Upgrade
-        self.THRESHOLD_GIT_HOUSE = 1    # 1 Commit -> 1 House (Debug)
 
 
         # Start listeners
@@ -151,18 +137,7 @@ class DataCollector:
         # 3. Update Progress Counters (Temporary)
         self.progress_active_sec += self.active_seconds
         self.progress_idle_sec += self.idle_seconds
-        # 3. Update Progress Counters (Temporary)
-        self.progress_active_sec += self.active_seconds
-        self.progress_idle_sec += self.idle_seconds
         self.progress_keys += self.key_presses
-        
-        # Persist Global Commit Count
-        # We need to load it first if we want robustness, but for now we just write what we tracked
-        # Actually, let's load it in init or save_data read phase.
-        # But 'data' dict is local here.
-        data["total_commits_detected"] = data.get("total_commits_detected", 0) + self.total_commits_all_time
-        # Reset local all time buffer so we don't double count on next save (since we read -> add -> write)
-        self.total_commits_all_time = 0
 
         # 4. Check & Trigger Rewards
         self.check_rewards()
@@ -340,92 +315,6 @@ class DataCollector:
         except Exception as e:
             print(f"Error updating world state: {e}")
 
-    def check_github_activity(self):
-        """Polls GitHub Events API for new commits"""
-        if not self.github_username: return
-        
-        print(f"Checking GitHub for {self.github_username}...")
-        url = f"https://api.github.com/users/{self.github_username}/events/public"
-        try:
-            r = requests.get(url, timeout=5)
-            if r.status_code != 200: return
-            
-            events = r.json()
-            # Look for PushEvents
-            # We need to find NEW commits since last check.
-            # Using simplest logic: checking the ID of the latest PushEvent.
-            # If changed, count the commits in payload.
-            
-            # Filter for PushEvents
-            push_events = [e for e in events if e.get('type') == 'PushEvent']
-            if not push_events: return
-            
-            latest_id = push_events[0]['id']
-            
-            if self.last_commit_id is None:
-                # First run, just mark the point, don't award retroactive
-                self.last_commit_id = latest_id
-                print(f"GitHub Baseline Set: {latest_id}")
-                return
-                
-            if latest_id == self.last_commit_id:
-                return # No new pushes
-                
-            # New Pushes found!
-            # Count commits between latest_id and last_commit_id
-            new_commits = 0
-            curr_id = latest_id
-            
-            for e in push_events:
-                if e['id'] == self.last_commit_id: break
-                
-                # Add size
-                payload = e.get('payload', {})
-                size = payload.get('size', 1) # Default 1 if missing
-                new_commits += size
-                
-            self.last_commit_id = latest_id
-            
-            if new_commits > 0:
-                print(f">>> GitHub Activity: +{new_commits} Commits Detected!")
-                self.commit_credits += new_commits
-                self.total_commits_all_time += new_commits
-                
-                # Check Threshold (1 Commit -> 1 House)
-                while self.commit_credits >= self.THRESHOLD_GIT_HOUSE:
-                    self.commit_credits -= self.THRESHOLD_GIT_HOUSE
-                    self.on_github_reward()
-                    
-        except Exception as e:
-            print(f"GitHub Check Error: {e}")
-
-    def on_github_reward(self):
-        """Builds a special 'git_post' house"""
-        print(">>> REWARD: GIT HOUSE UNLOCKED!")
-        if self.on_reward: self.on_reward("Git Tower Built! 🐙", "10 Commits pushed! A new tower rises.")
-        
-        houses_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visualizer", "stargazers_houses.json")
-        roads_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visualizer", "roads.json")
-        
-        try:
-            with open(houses_path, 'r') as f:
-                houses = json.load(f)
-                
-            houses.append({
-                "type": "git_post",
-                "login": f"Commit Node #{random.randint(100,999)}",
-                # Placeholder, will be fixed by recalculate
-                "x": 0, "y": 0,
-                "color": "#00e152", # Fallback
-                "facing": "right" 
-            })
-            
-            if generate_city_slots:
-                self.recalculate_and_save(houses, houses_path, roads_path)
-                
-        except Exception as e:
-            print(f"Error building Git House: {e}")
-
     def monitor_loop(self):
         """Checks idle status every second"""
         while self.running:
@@ -438,12 +327,7 @@ class DataCollector:
             # Update world state logic less frequently? 
             # Doing it every second is overkill but harmless for check.
             # Writing only happens on change.
-            # Update world state logic less frequently? 
             self.update_world_state()
-            
-            # Check GitHub every 60 seconds (approx)
-            if int(time.time()) % 60 == 0:
-                self.check_github_activity()
             
             time.sleep(1)
 
