@@ -6,8 +6,6 @@ from datetime import datetime
 from pynput import keyboard, mouse
 import ctypes
 from ctypes import Structure, windll, c_uint, sizeof, byref
-import urllib.request
-import urllib.error
 
 # -------------------------------------------------------------------------
 # Windows API for Idle Time
@@ -47,11 +45,6 @@ class DataCollector:
         self.filename = filename
         self.on_reward = on_reward
         
-        # Git Configuration
-        self.GITHUB_USERNAME = "addressmehari" # CHANGE THIS TO YOUR USERNAME
-        self.git_poll_interval = 300 # 5 minutes to be safe with rate limits
-        self.last_poll_time = 0
-        
         # In-memory metrics
         self.key_presses = 0
         self.mouse_clicks = 0
@@ -62,22 +55,16 @@ class DataCollector:
         self.idle_threshold_sec = 2.0 
         self.running = True
 
-        # Progress Counters
+        # Progress Counters (Temporary, reset after reward)
         self.progress_active_sec = 0
         self.progress_idle_sec = 0
         self.progress_keys = 0
-        self.progress_commits = 0 # New: Track commits for next house
-        self.total_commits = 0    # New: Global count
-        self.last_git_event_id = None
         
-        # Thresholds
-        self.THRESHOLD_HOUSE = 300      # 5 mins active -> 1 House
-        self.THRESHOLD_TREE = 600       # 10 mins idle -> 1 Tree
-        self.THRESHOLD_UPGRADE = 2000   # 2000 keys -> 1 Upgrade
-        self.THRESHOLD_GIT_HOUSE = 1    # 1 commit -> 1 Sci-Fi House
+        # Thresholds (Reduced for Testing)
+        self.THRESHOLD_HOUSE = 10       # 10 active seconds -> 1 House
+        self.THRESHOLD_TREE = 10        # 10 idle seconds -> 1 Tree
+        self.THRESHOLD_UPGRADE = 50     # 50 keys -> 1 Upgrade
 
-        # Load existing Git state if possible
-        self.load_initial_state()
 
         # Start listeners
         self.keyboard_listener = keyboard.Listener(on_release=self.on_key)
@@ -94,23 +81,6 @@ class DataCollector:
         self.monitor_thread.start()
         
         print(f"Collector started. saving to {self.filename} every minute.")
-        print(f"Tracking GitHub user: {self.GITHUB_USERNAME}")
-
-    def load_initial_state(self):
-        if os.path.exists(self.filename):
-            try:
-                with open(self.filename, 'r') as f:
-                    data = json.load(f)
-                    if isinstance(data, dict):
-                        self.last_git_event_id = data.get("last_git_event_id")
-                        self.progress_commits = data.get("progress_commits", 0)
-                        self.total_commits = data.get("total_commits", 0)
-                        # Optionally load other progress to persist across restarts
-                        self.progress_active_sec = data.get("saved_progress_active", 0)
-                        self.progress_idle_sec = data.get("saved_progress_idle", 0)
-                        self.progress_keys = data.get("saved_progress_keys", 0)
-            except Exception as e:
-                print(f"Error loading initial state: {e}")
 
     def on_key(self, key):
         self.key_presses += 1
@@ -118,52 +88,6 @@ class DataCollector:
     def on_click(self, x, y, button, pressed):
         if pressed:
             self.mouse_clicks += 1
-
-    def poll_github(self):
-        """Polls GitHub API for new PushEvents"""
-        if not self.GITHUB_USERNAME: return
-        
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Polling GitHub for {self.GITHUB_USERNAME}...")
-        url = f"https://api.github.com/users/{self.GITHUB_USERNAME}/events"
-        
-        try:
-            req = urllib.request.Request(url, headers={'User-Agent': 'Python-Activity-Tracker'})
-            with urllib.request.urlopen(req) as response:
-                if response.status == 200:
-                    events = json.loads(response.read().decode())
-                    new_commits = 0
-                    
-                    # Process events (newest first)
-                    current_batch_ids = []
-                    
-                    for event in events:
-                        eid = event['id']
-                        if self.last_git_event_id and eid == self.last_git_event_id:
-                            break
-                        
-                        current_batch_ids.append(eid)
-                        
-                        if event['type'] == 'PushEvent':
-                            commits = event.get('payload', {}).get('commits', [])
-                            new_commits += len(commits)
-                    
-                    if not self.last_git_event_id and len(events) > 0:
-                         # First run ever: sync to latest to avoid counting history
-                         if len(events) > 0:
-                             self.last_git_event_id = events[0]['id']
-                    elif current_batch_ids:
-                         # Update ID to the newest one seen
-                         self.last_git_event_id = current_batch_ids[0]
-                         if new_commits > 0:
-                             print(f"Found {new_commits} new commits!")
-                             self.progress_commits += new_commits
-                             self.total_commits += new_commits
-                             self.check_rewards()
-
-        except urllib.error.URLError as e:
-            print(f"GitHub Poll Error: {e}")
-        except Exception as e:
-            print(f"General GitHub Error: {e}")
 
     def save_data(self):
         # 1. Read existing totals
@@ -210,20 +134,10 @@ class DataCollector:
         data["total_idle_seconds"] = data.get("total_idle_seconds", 0) + self.idle_seconds
         data["last_updated"] = datetime.now().isoformat()
         
-        # 3. Update Progress Counters
+        # 3. Update Progress Counters (Temporary)
         self.progress_active_sec += self.active_seconds
         self.progress_idle_sec += self.idle_seconds
         self.progress_keys += self.key_presses
-        
-        # Git State Persistence
-        data["last_git_event_id"] = self.last_git_event_id
-        data["progress_commits"] = self.progress_commits
-        data["total_commits"] = self.total_commits
-        
-        # Persist standard progress
-        data["saved_progress_active"] = self.progress_active_sec 
-        data["saved_progress_idle"] = self.progress_idle_sec
-        data["saved_progress_keys"] = self.progress_keys
 
         # 4. Check & Trigger Rewards
         self.check_rewards()
@@ -300,24 +214,11 @@ class DataCollector:
             # Find a house without terrace
             candidates = [h for h in houses if h.get('obstacle') != 'tree' and not h.get('has_terrace')]
             if candidates:
+                # Pick random? Or first? Random is better
                 import random
                 target = random.choice(candidates)
                 target['has_terrace'] = True
                 rewards_triggered = True
-
-        # D. Git Houses (Commits)
-        while self.progress_commits >= self.THRESHOLD_GIT_HOUSE:
-            self.progress_commits -= self.THRESHOLD_GIT_HOUSE
-            print(">>> REWARD: NEW SCI-FI GIT HOUSE!")
-            if self.on_reward: self.on_reward("Git Post Built! 🚀", "5 Commits detected. A new Sci-Fi data tower has been constructed.")
-            houses.append({
-                "type": "git_post",
-                "login": f"Commit Node {self.total_commits}",
-                "username": self.GITHUB_USERNAME,
-                "x": 0, "y": 0,
-                "facing": "right"
-            })
-            rewards_triggered = True
 
         if rewards_triggered and generate_city_slots:
             self.recalculate_and_save(houses, houses_path, roads_path)
@@ -427,12 +328,6 @@ class DataCollector:
             # Doing it every second is overkill but harmless for check.
             # Writing only happens on change.
             self.update_world_state()
-            
-            # Git Poll Check
-            now = time.time()
-            if now - self.last_poll_time > self.git_poll_interval:
-                self.last_poll_time = now
-                self.poll_github()
             
             time.sleep(1)
 
