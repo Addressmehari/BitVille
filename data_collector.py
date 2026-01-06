@@ -11,6 +11,14 @@ from ctypes import Structure, windll, c_uint, sizeof, byref
 # Windows API for Idle Time
 # -------------------------------------------------------------------------
 import sys
+import re
+import urllib.request
+import ssl
+import random
+
+# CONSTANTS
+GITHUB_USERNAME = "Addressmehari"
+GIT_POST_THRESHOLD = 1
 
 # Allow importing from visualizer folder
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'visualizer'))
@@ -37,6 +45,42 @@ def get_idle_duration():
         return millis / 1000.0
     return 0.0
 
+def get_github_contributions(username):
+    """Scrapes the total contributions from the Github profile page."""
+    # Use the partial view which is more reliable and lighter
+    url = f"https://github.com/users/{username}/contributions"
+    try:
+        # Create a context that doesn't verify SSL certificates
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        
+        req = urllib.request.Request(
+            url, 
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+        )
+        
+        with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
+            html = response.read().decode('utf-8')
+            
+            patterns = [
+                r'([\d,]+)\s+contributions\s+in\s+the\s+last\s+year',
+                r'([\d,]+)\s+contributions\s+in\s+\d{4}'
+            ]
+            
+            for p in patterns:
+                match = re.search(p, html)
+                if match:
+                    count_str = match.group(1).replace(',', '')
+                    return int(count_str)
+                    
+            print("Could not find contribution count in profile HTML.")
+            return None
+            
+    except Exception as e:
+        print(f"Error fetching Github stats: {e}")
+        return None
+
 # -------------------------------------------------------------------------
 # Data Collector Class
 # -------------------------------------------------------------------------
@@ -59,11 +103,17 @@ class DataCollector:
         self.progress_active_sec = 0
         self.progress_idle_sec = 0
         self.progress_keys = 0
+        self.progress_commits = 0
+        
+        # Last known total to calculate diffs
+        self.last_total_commits = 0
         
         # Thresholds (Reduced for Testing)
-        self.THRESHOLD_HOUSE = 10       # 10 active seconds -> 1 House
-        self.THRESHOLD_TREE = 10        # 10 idle seconds -> 1 Tree
-        self.THRESHOLD_UPGRADE = 50     # 50 keys -> 1 Upgrade
+        
+        # Thresholds (Reduced for Testing)
+        self.THRESHOLD_HOUSE = 300      # 300 active seconds -> 1 House (Normal)
+        self.THRESHOLD_TREE = 300       # 300 idle seconds -> 1 Tree (Normal)
+        self.THRESHOLD_UPGRADE = 1000   # 1000 keys -> 1 Upgrade
 
 
         # Start listeners
@@ -76,9 +126,11 @@ class DataCollector:
         # Start background threads
         self.saver_thread = threading.Thread(target=self.save_loop, daemon=True)
         self.monitor_thread = threading.Thread(target=self.monitor_loop, daemon=True)
+        self.github_thread = threading.Thread(target=self.github_loop, daemon=True)
         
         self.saver_thread.start()
         self.monitor_thread.start()
+        self.github_thread.start()
         
         print(f"Collector started. saving to {self.filename} every minute.")
 
@@ -116,6 +168,8 @@ class DataCollector:
                     "total_clicks": 0,
                     "total_active_seconds": 0,
                     "total_idle_seconds": 0,
+                    "total_commits": 0,
+                    "progress_commits": 0,
                     "last_updated": ""
                 }
         else:
@@ -124,6 +178,8 @@ class DataCollector:
                 "total_clicks": 0,
                 "total_active_seconds": 0,
                 "total_idle_seconds": 0,
+                "total_commits": 0,
+                "progress_commits": 0,
                 "last_updated": ""
             }
 
@@ -138,6 +194,10 @@ class DataCollector:
         self.progress_active_sec += self.active_seconds
         self.progress_idle_sec += self.idle_seconds
         self.progress_keys += self.key_presses
+        
+        # Persist the commit counters (they are updated in github_loop, but save them here)
+        data["total_commits"] = self.last_total_commits
+        data["progress_commits"] = self.progress_commits
 
         # 4. Check & Trigger Rewards
         self.check_rewards()
@@ -162,7 +222,6 @@ class DataCollector:
     def get_random_house_name(self):
         prefixes = ["Pixel", "Syntax", "Logic", "Binary", "Coder's", "Data", "Algorithm", "Memory", "Git", "Python", "Terminal", "Debug", "Loop", "Function", "Variable", "Cloud", "Server", "Script", "Byte", "Stack"]
         suffixes = ["Cottage", "Station", "Loft", "Bungalow", "Cabin", "Den", "Abode", "Manor", "Garrison", "Palace", "Tower", "Dwelling", "Lodge", "Farm", "Villa", "Hut", "Keep", "Hub", "Base", "Outpost"]
-        import random
         return f"{random.choice(prefixes)} {random.choice(suffixes)}"
 
     def check_rewards(self):
@@ -215,17 +274,31 @@ class DataCollector:
             candidates = [h for h in houses if h.get('obstacle') != 'tree' and not h.get('has_terrace')]
             if candidates:
                 # Pick random? Or first? Random is better
-                import random
                 target = random.choice(candidates)
                 target['has_terrace'] = True
                 rewards_triggered = True
+
+        # D. Github Posts (Commits)
+        while self.progress_commits >= GIT_POST_THRESHOLD:
+            self.progress_commits -= GIT_POST_THRESHOLD
+            print(">>> REWARD: New Git Post Created!")
+            if self.on_reward: self.on_reward("Git Post! 🐙", "5 Commits pushed! A new Git House appears.")
+            
+            # Find a location? (Recalculate handles it)
+            # Create Git Post House
+            houses.append({
+                "type": "git_post",
+                "login": f"Commit Node {random.randint(100,999)}",
+                "x": 0, "y": 0, # Placeholder
+                "username": self.get_random_house_name(), # Use random name for variety
+            })
+            rewards_triggered = True
 
         if rewards_triggered and generate_city_slots:
             self.recalculate_and_save(houses, houses_path, roads_path)
 
     def recalculate_and_save(self, entities, h_path, r_path):
         """Recalculates positions and saves files"""
-        import random 
         # Separate Owner (First)
         if not entities: return
         
@@ -271,8 +344,19 @@ class DataCollector:
                     ent['windowStyle'] = attrs[2]
                     ent['chimneyStyle'] = attrs[3]
                     ent['wallStyle'] = attrs[4]
+                    ent['wallStyle'] = attrs[4]
                     if 'has_terrace' not in ent: ent['has_terrace'] = False
-                    
+            
+            # Determine color/style for git_post
+            if ent.get('type') == 'git_post':
+                 # Force Orange for Git Posts
+                 ent['color'] = "#f05032" # Git Orange
+                 ent['roofStyle'] = 1
+                 ent['doorStyle'] = 3
+                 ent['wallStyle'] = 0
+                 ent['username'] = ent.get('login', 'Git Post')
+                 ent['has_terrace'] = True # Always fancy
+
             # Update Facing
             if i < len(facings):
                 ent['facing'] = facings[i]
@@ -335,6 +419,81 @@ class DataCollector:
         while self.running:
             time.sleep(self.save_interval_sec)
             self.save_data()
+
+    def github_loop(self):
+        """Checks github stats every 5 minutes (300s)"""
+        # Initial wait to let other things load? No, check immediately.
+        # But we need to load 'last_total_commits' from file if possible first.
+        # It's done in save_data... wait, __init__ triggers separate threads.
+        # We need to load initial state.
+        
+        # Load initial
+        if os.path.exists(self.filename):
+            try:
+                with open(self.filename, 'r') as f:
+                    d = json.load(f)
+                    self.last_total_commits = d.get('total_commits', 0)
+                    self.progress_commits = d.get('progress_commits', 0)
+            except: pass
+            
+        print(f"Github Monitor started. Target: {GITHUB_USERNAME}")
+        
+        # Initial Check: Create one if none exist
+        houses_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visualizer", "stargazers_houses.json")
+        try:
+             with open(houses_path, 'r') as f:
+                h_data = json.load(f)
+                git_posts = [h for h in h_data if h.get('type') == 'git_post']
+                if not git_posts:
+                    print("No Git Posts found. Creating the First Foundation...")
+                    h_data.append({
+                        "type": "git_post",
+                        "login": "Git Foundation",
+                        "x": 0, "y": 0,
+                        "username": "Git Foundation",
+                        "color": "#f05032",
+                        "has_terrace": True
+                    })
+                    # Save immediately to establish base
+                    # But we also need to recalculate coords.
+                    # Use self.recalculate_and_save
+                    roads_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visualizer", "roads.json")
+                    self.recalculate_and_save(h_data, houses_path, roads_path)
+        except Exception as e:
+            print(f"Error checking initial git posts: {e}")
+
+        while self.running:
+            current = get_github_contributions(GITHUB_USERNAME)
+            if current is not None:
+                print(f"[Github] Contributions: {current} (Last: {self.last_total_commits})")
+                
+                if current > self.last_total_commits:
+                    diff = current - self.last_total_commits
+                    # Sanity check: if diff is huge (e.g. first run of year), restrict?
+                    # User said "count 5 commits". If we jump from 0 to 1000, we get 200 houses.
+                    # That might be intended. But if self.last_total_commits was 0 (fresh install), 
+                    # we shouldn't spam 200 houses unless the user wants it.
+                    # However, typical usage logic implies capturing *new* activity.
+                    # If this is the FIRST run ever, last_total_commits might be 0.
+                    # If current is 500, diff is 500.
+                    # We should probably initialize last_total_commits to current on FIRST run,
+                    # UNLESS we want to backfill.
+                    # "check the profile, after the last created house how many commited"
+                    # If 0 houses, we created one.
+                    # So we should probably start counting from NOW.
+                    
+                    if self.last_total_commits == 0 and diff > 100:
+                        # First sync, likely. Set baseline.
+                        self.last_total_commits = current
+                        print("Initialized Github Baseline.")
+                        diff = 0
+                    
+                    if diff > 0:
+                        self.progress_commits += diff
+                        self.last_total_commits = current
+                        self.check_rewards() # Trigger generation
+                        
+            time.sleep(180) # Check every 3 minutes (180s)
 
     def stop(self):
         self.running = False
