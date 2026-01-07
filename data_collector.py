@@ -107,6 +107,7 @@ class DataCollector:
         
         # Last known total to calculate diffs
         self.last_total_commits = 0
+        self.upgrade_target_user = None
         
         # Thresholds (Reduced for Testing)
         
@@ -137,6 +138,7 @@ class DataCollector:
         self.update_house_count()
         
         print(f"Collector started. saving to {self.filename} every minute.")
+        self.ensure_next_upgrade_target()
 
     def on_key(self, key):
         self.key_presses += 1
@@ -274,13 +276,30 @@ class DataCollector:
             self.progress_keys -= self.THRESHOLD_UPGRADE
             print(">>> REWARD: House Upgrade Unlocked!")
             if self.on_reward: self.on_reward("Upgrade Unlocked! ✨", "Your typing frenzy added a terrace to a house!")
-            # Find a house without terrace
-            candidates = [h for h in houses if h.get('obstacle') != 'tree' and not h.get('has_terrace')]
-            if candidates:
-                # Pick random? Or first? Random is better
-                target = random.choice(candidates)
+            
+            # 1. Find the designated target from 'houses' list
+            target = next((h for h in houses if h.get('is_upgrade_target')), None)
+            
+            # Fallback if no target marked
+            if not target:
+                candidates = [h for h in houses if h.get('obstacle') != 'tree' and not h.get('has_terrace')]
+                if candidates:
+                    target = random.choice(candidates)
+
+            if target:
                 target['has_terrace'] = True
+                # Clean up flag
+                if 'is_upgrade_target' in target:
+                    del target['is_upgrade_target']
+                
                 rewards_triggered = True
+
+                # 2. Pick NEXT target immediately to show in UI
+                candidates = [h for h in houses if h.get('obstacle') != 'tree' and h.get('type') != 'git_post' and not h.get('has_terrace') and not h.get('is_upgrade_target')]
+                if candidates:
+                    next_target = random.choice(candidates)
+                    next_target['is_upgrade_target'] = True
+                    self.upgrade_target_user = next_target.get('username')
 
         # D. Github Posts (Commits)
         while self.progress_commits >= GIT_POST_THRESHOLD:
@@ -439,6 +458,7 @@ class DataCollector:
         
         current_active = self.progress_active_sec + self.active_seconds
         current_idle = self.progress_idle_sec + self.idle_seconds
+        current_keys = self.progress_keys + self.key_presses
         # Commits are instantly updated in github_loop, so just use progress_commits
         current_commits = self.progress_commits
 
@@ -459,8 +479,14 @@ class DataCollector:
                     "current": int(current_commits),
                     "max": GIT_POST_THRESHOLD,
                     "label": "Git Post"
+                },
+                "keys": {
+                    "current": int(current_keys),
+                    "max": self.THRESHOLD_UPGRADE,
+                    "label": "Upgrade"
                 }
-            }
+            },
+            "upgrade_target": self.upgrade_target_user
         }
         
         out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visualizer", "construction_state.json")
@@ -469,6 +495,36 @@ class DataCollector:
                 json.dump(state, f)
         except Exception:
             pass
+
+    def ensure_next_upgrade_target(self):
+        """Ensures one house is targeted for the next upgrade"""
+        houses_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visualizer", "stargazers_houses.json")
+        if not os.path.exists(houses_path): return
+
+        try:
+            with open(houses_path, 'r') as f:
+                houses = json.load(f)
+            
+            # Check if one is already targeted
+            existing = next((h for h in houses if h.get('is_upgrade_target')), None)
+            if existing:
+                self.upgrade_target_user = existing.get('username')
+                return
+
+            # Pick new target (exclude trees, git posts, and already terraced houses)
+            candidates = [h for h in houses if h.get('obstacle') != 'tree' and h.get('type') != 'git_post' and not h.get('has_terrace')]
+            if candidates:
+                target = random.choice(candidates)
+                target['is_upgrade_target'] = True
+                self.upgrade_target_user = target.get('username')
+                
+                # Save just the metadata update
+                with open(houses_path, 'w') as f:
+                    json.dump(houses, f, indent=4)
+                print(f"Next Upgrade Target selected: {self.upgrade_target_user}")
+                
+        except Exception as e:
+            print(f"Error ensuring upgrade target: {e}")
 
     def monitor_loop(self):
         """Checks idle status every second"""

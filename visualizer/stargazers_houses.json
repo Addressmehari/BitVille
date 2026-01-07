@@ -54,7 +54,7 @@
         "windowStyle": 1,
         "chimneyStyle": 0,
         "wallStyle": 2,
-        "has_terrace": false,
+        "has_terrace": true,
         "facing": "left"
     },
     {
@@ -77,7 +77,8 @@
         "chimneyStyle": 0,
         "wallStyle": 0,
         "has_terrace": false,
-        "facing": "left"
+        "facing": "left",
+        "is_upgrade_target": true
     },
     {
         "type": "tree",
@@ -164,7 +165,73 @@
         "windowStyle": 2,
         "chimneyStyle": 0,
         "wallStyle": 3,
+        "has_terrace": true,
+        "facing": "left"
+    },
+    {
+        "type": "tree",
+        "x": 5.0,
+        "y": -9.0,
+        "obstacle": "tree",
+        "facing": "left"
+    },
+    {
+        "type": "activity_house",
+        "login": "Syntax Loft",
+        "x": 7.0,
+        "y": -9.0,
+        "username": "Syntax Loft",
+        "color": "#e69dd1",
+        "roofStyle": 2,
+        "doorStyle": 2,
+        "windowStyle": 1,
+        "chimneyStyle": 1,
+        "wallStyle": 1,
         "has_terrace": false,
         "facing": "left"
+    },
+    {
+        "type": "tree",
+        "x": 9.0,
+        "y": -9.0,
+        "obstacle": "tree",
+        "facing": "left"
+    },
+    {
+        "type": "tree",
+        "x": -3.0,
+        "y": -3.0,
+        "obstacle": "tree",
+        "facing": "right"
+    },
+    {
+        "type": "activity_house",
+        "login": "Python Palace",
+        "x": -5.0,
+        "y": -3.0,
+        "username": "Python Palace",
+        "color": "#ea0235",
+        "roofStyle": 2,
+        "doorStyle": 2,
+        "windowStyle": 0,
+        "chimneyStyle": 2,
+        "wallStyle": 3,
+        "has_terrace": false,
+        "facing": "right"
+    },
+    {
+        "type": "activity_house",
+        "login": "Server Garrison",
+        "x": -7.0,
+        "y": -3.0,
+        "username": "Server Garrison",
+        "color": "#c0538b",
+        "roofStyle": 0,
+        "doorStyle": 0,
+        "windowStyle": 1,
+        "chimneyStyle": 3,
+        "wallStyle": 0,
+        "has_terrace": false,
+        "facing": "right"
     }
 ]

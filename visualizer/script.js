@@ -844,10 +844,10 @@ function renderHouses() {
                 drawGitHouse(house.x, house.y, house.hoverAnim, house.username, house.facing);
              } else {
                  // Fallback
-                 drawHouse(house.x, house.y, house.color, house.roofStyle, house.doorStyle, house.windowStyle, house.chimneyStyle, house.wallStyle, house.hoverAnim, house.username, house.abandoned, house.facing, house.has_terrace);
+                 drawHouse(house.x, house.y, house.color, house.roofStyle, house.doorStyle, house.windowStyle, house.chimneyStyle, house.wallStyle, house.hoverAnim, house.username, house.abandoned, house.facing, house.has_terrace, house.is_upgrade_target);
              }
         } else {
-            drawHouse(house.x, house.y, house.color, house.roofStyle, house.doorStyle, house.windowStyle, house.chimneyStyle, house.wallStyle, house.hoverAnim, house.username, house.abandoned, house.facing, house.has_terrace);
+            drawHouse(house.x, house.y, house.color, house.roofStyle, house.doorStyle, house.windowStyle, house.chimneyStyle, house.wallStyle, house.hoverAnim, house.username, house.abandoned, house.facing, house.has_terrace, house.is_upgrade_target);
         }
     }
 }
@@ -883,7 +883,7 @@ function updateHoverState() {
     }
 }
 
-function drawHouse(gx, gy, color, roofStyle, doorStyle, windowStyle, chimneyStyle, wallStyle, hoverAnim, username, abandoned, facing, has_terrace) {
+function drawHouse(gx, gy, color, roofStyle, doorStyle, windowStyle, chimneyStyle, wallStyle, hoverAnim, username, abandoned, facing, has_terrace, is_upgrade_target) {
     const isoCenter = gridToWorld(gx, gy);
 
     // --- "Sketchy" Style Hook (Abandoned Only) ---
@@ -2814,6 +2814,59 @@ function drawHouse(gx, gy, color, roofStyle, doorStyle, windowStyle, chimneyStyl
     // Restore Context Hook
     if (abandoned) {
         ctx.stroke = originalStroke;
+    }
+
+    // --- Upgrade Progress Bar ---
+    // Check dynamic target from construction state (allows update without reload)
+    const isTarget = (typeof constructionState !== 'undefined' && constructionState && constructionState.upgrade_target === username);
+    
+    if (isTarget && constructionState.metrics && constructionState.metrics.keys) {
+        const kParams = constructionState.metrics.keys;
+        const pct = Math.min(1, Math.max(0, kParams.current / kParams.max));
+        
+        ctx.save();
+        
+        const barW = 44;
+        const barH = 6;
+        
+        // Position: Top of roof (rFront is peak)
+        // Shifted slightly right as requested
+        const offsetX = 20;
+        const bx = rFront.x - barW / 2 + offsetX;
+        const by = rFront.y - 30; 
+        
+        // Glow (Gold or Green)
+        const glowColor = pct >= 1 ? "#00b894" : "#ffdd59";
+        
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = glowColor;
+        
+        // Draw Track (Dark semi-opaque)
+        ctx.fillStyle = "rgba(0,0,0,0.7)";
+        ctx.fillRect(bx - 1, by - 1, barW + 2, barH + 2); // Border bg
+        
+        // Draw Fill
+        ctx.fillStyle = glowColor;
+        // ctx.shadowBlur is active here causing the glow
+        ctx.fillRect(bx, by, barW * pct, barH);
+        
+        // Gloss / Shine (Top Half)
+        ctx.shadowBlur = 0; // Reset for crisp shine
+        ctx.fillStyle = "rgba(255,255,255,0.25)";
+        ctx.fillRect(bx, by, barW * pct, barH / 2);
+
+        // Label ("UPGRADE")
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 9px 'Segoe UI', sans-serif";
+        ctx.textAlign = "center";
+        
+        // Text Shadow
+        ctx.shadowColor = "rgba(0,0,0,1)";
+        ctx.shadowBlur = 3;
+        ctx.fillText("", rFront.x + offsetX, by - 20);
+        ctx.shadowBlur = 0;
+
+        ctx.restore();
     }
 }
 

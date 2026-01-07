@@ -1,11 +1,11 @@
 {
-    "total_keys": 2737,
-    "total_clicks": 505,
-    "total_active_seconds": 2757,
-    "total_idle_seconds": 2411,
-    "total_commits": 225,
-    "progress_commits": 1,
-    "last_updated": "2026-01-07T13:44:38.282582",
+    "total_keys": 5025,
+    "total_clicks": 787,
+    "total_active_seconds": 4135,
+    "total_idle_seconds": 3884,
+    "total_commits": 226,
+    "progress_commits": 2,
+    "last_updated": "2026-01-07T14:47:15.735243",
     "app_usage": {
         "Antigravity.exe": 4
     }
