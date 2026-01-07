@@ -41,5 +41,108 @@
         "wallStyle": 0,
         "has_terrace": true,
         "facing": "left"
+    },
+    {
+        "type": "activity_house",
+        "login": "Algorithm Base",
+        "x": 7.0,
+        "y": -3.0,
+        "username": "Algorithm Base",
+        "color": "#2c9c26",
+        "roofStyle": 2,
+        "doorStyle": 0,
+        "windowStyle": 1,
+        "chimneyStyle": 0,
+        "wallStyle": 2,
+        "has_terrace": false,
+        "facing": "left"
+    },
+    {
+        "type": "tree",
+        "x": 9.0,
+        "y": -3.0,
+        "obstacle": "tree",
+        "facing": "left"
+    },
+    {
+        "type": "activity_house",
+        "login": "Algorithm Hub",
+        "x": 3.0,
+        "y": -5.0,
+        "username": "Algorithm Hub",
+        "color": "#7f8cc5",
+        "roofStyle": 3,
+        "doorStyle": 3,
+        "windowStyle": 0,
+        "chimneyStyle": 0,
+        "wallStyle": 0,
+        "has_terrace": false,
+        "facing": "left"
+    },
+    {
+        "type": "tree",
+        "x": 5.0,
+        "y": -5.0,
+        "obstacle": "tree",
+        "facing": "left"
+    },
+    {
+        "type": "activity_house",
+        "login": "Coder's Den",
+        "x": 7.0,
+        "y": -5.0,
+        "username": "Coder's Den",
+        "color": "#7046f9",
+        "roofStyle": 3,
+        "doorStyle": 0,
+        "windowStyle": 0,
+        "chimneyStyle": 2,
+        "wallStyle": 3,
+        "has_terrace": false,
+        "facing": "left"
+    },
+    {
+        "type": "activity_house",
+        "login": "Data Den",
+        "x": 9.0,
+        "y": -5.0,
+        "username": "Data Den",
+        "color": "#36dffb",
+        "roofStyle": 3,
+        "doorStyle": 2,
+        "windowStyle": 1,
+        "chimneyStyle": 3,
+        "wallStyle": 3,
+        "has_terrace": false,
+        "facing": "left"
+    },
+    {
+        "type": "tree",
+        "x": 3.0,
+        "y": -7.0,
+        "obstacle": "tree",
+        "facing": "left"
+    },
+    {
+        "type": "activity_house",
+        "login": "Cloud Den",
+        "x": 5.0,
+        "y": -7.0,
+        "has_terrace": true,
+        "username": "Cloud Den",
+        "color": "#9eb8bb",
+        "roofStyle": 1,
+        "doorStyle": 2,
+        "windowStyle": 3,
+        "chimneyStyle": 0,
+        "wallStyle": 3,
+        "facing": "left"
+    },
+    {
+        "type": "tree",
+        "x": 7.0,
+        "y": -7.0,
+        "obstacle": "tree",
+        "facing": "left"
     }
 ]

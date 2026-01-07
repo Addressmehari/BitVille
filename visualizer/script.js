@@ -68,6 +68,10 @@ let roads = new Set(); // Set of "x,y" strings
 let worldConfig = { weather: "none" }; // Default config
 let cloudSystem; // Cloud Manager
 let npcManager; // NPC Manager
+let constructionState = null; // Next building spot and progress
+let constructionHoverAnim = 0; // Animation state for construction bars
+
+
 
 // --- Initialization ---
 async function init() {
@@ -129,7 +133,15 @@ async function init() {
                 }
             }
         } catch(e) { console.log("Polling failed", e); }
-    }, 10000);
+        
+        // Poll Construction State (more frequently if needed, but 1s is fine)
+        try {
+            const constRes = await fetch('construction_state.json?t=' + Date.now());
+            if (constRes.ok) {
+                constructionState = await constRes.json();
+            }
+        } catch(e) { /* ignore */ }
+    }, 1000); // Increased polling rate to 1s for smoother progress bars
 
     requestAnimationFrame(render);
 }
@@ -802,7 +814,19 @@ function renderHouses() {
     // Higher x + y means closer to the viewer (lower on screen)
     // So we render lower (x+y) first, and higher (x+y) last.
 
-    const sortedHouses = [...houses].sort((a, b) => {
+    const renderList = [...houses];
+    
+    // Inject Construction Site
+    if (constructionState && constructionState.next_slot) {
+        renderList.push({
+            x: constructionState.next_slot.x,
+            y: constructionState.next_slot.y,
+            type: 'construction',
+            metrics: constructionState.metrics
+        });
+    }
+    
+    const sortedHouses = renderList.sort((a, b) => {
         return (a.x + a.y) - (b.x + b.y);
     });
 
@@ -810,10 +834,18 @@ function renderHouses() {
     // but unless we have thousands, iterating is cheap. Drawing is the cost.
 
     for (const house of sortedHouses) {
-        if (house.obstacle === 'tree') {
+        if (house.type === 'construction') {
+            drawConstructionSite(house.x, house.y, house.metrics);
+        } else if (house.obstacle === 'tree') {
             drawTree(house.x, house.y, ctx);
         } else if (house.type === 'git_post') {
-            drawGitHouse(house.x, house.y, house.hoverAnim, house.username, house.facing);
+            // Check if drawGitHouse exists, fall back to drawHouse if not
+             if (typeof drawGitHouse !== 'undefined') {
+                drawGitHouse(house.x, house.y, house.hoverAnim, house.username, house.facing);
+             } else {
+                 // Fallback
+                 drawHouse(house.x, house.y, house.color, house.roofStyle, house.doorStyle, house.windowStyle, house.chimneyStyle, house.wallStyle, house.hoverAnim, house.username, house.abandoned, house.facing, house.has_terrace);
+             }
         } else {
             drawHouse(house.x, house.y, house.color, house.roofStyle, house.doorStyle, house.windowStyle, house.chimneyStyle, house.wallStyle, house.hoverAnim, house.username, house.abandoned, house.facing, house.has_terrace);
         }
@@ -839,6 +871,15 @@ function updateHoverState() {
         const target = isHovered ? 1.0 : 0.0;
         // Smooth Lerp
         house.hoverAnim += (target - house.hoverAnim) * 0.3;
+    }
+
+    // 5. Check Construction Site
+    if (constructionState && constructionState.next_slot) {
+        const cx = constructionState.next_slot.x;
+        const cy = constructionState.next_slot.y;
+        const isHovered = (cx === gx && cy === gy);
+        const target = isHovered ? 1.0 : 0.0;
+        constructionHoverAnim += (target - constructionHoverAnim) * 0.2; // Slightly slower
     }
 }
 
@@ -3023,6 +3064,323 @@ function drawGitHouse(gx, gy, hoverAnim, username, facing) {
         ctx.textAlign = "center"; ctx.fillText(txt, 0, -15);
         ctx.restore();
     }
+}
+
+// --- Construction Site Renderer ---
+function drawConstructionSite(gx, gy, metrics) {
+    const pos = gridToWorld(gx, gy);
+    const x = pos.x;
+    const y = pos.y;
+    const time = Date.now() * 0.003; // Animation time
+
+    const hw = (TILE_WIDTH / 2) * 0.75; // Smaller 75%
+    const hh = (TILE_HEIGHT / 2) * 0.75;
+
+    // Corners
+    const corners = [
+        { dx: 0, dy: -hh }, // 0: Top (Back)
+        { dx: hw, dy: 0 },   // 1: Right
+        { dx: 0, dy: hh },  // 2: Bottom (Front)
+        { dx: -hw, dy: 0 }   // 3: Left
+    ];
+
+    const tapeYOff = -12;
+
+    // Helper to draw tape segment with gravity and wind
+    const drawTape = (indices) => {
+        ctx.save();
+        ctx.lineWidth = 2.5; // Slightly thinner for elegance
+        ctx.lineCap = "round";
+        
+        // animation
+        const speed = -time * 20;
+
+        // Draw Yellow Base first
+        ctx.strokeStyle = "#f39c12"; // Darker yellow/orange base
+        
+        // Define path generator to avoid code duplication for the two passes
+        const tracePath = () => {
+             ctx.beginPath();
+             for(let i=0; i<indices.length - 1; i++) {
+                const c1 = corners[indices[i]];
+                const c2 = corners[indices[i+1]];
+                
+                const x1 = x + c1.dx; const y1 = y + c1.dy + tapeYOff;
+                const x2 = x + c2.dx; const y2 = y + c2.dy + tapeYOff;
+                
+                // Sag Math
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const midX = (x1 + x2) / 2;
+                const midY = (y1 + y2) / 2;
+                
+                // Oscillating Sway
+                // Different phase for each segment
+                const phase = i * 2.5; 
+                const sagAmp = 4;
+                const wind = Math.sin(time * 4 + phase) * 2; 
+                
+                // Curve Control Point: Middle + Sag + Wind
+                const cpX = midX;
+                const cpY = midY + sagAmp + wind;
+                
+                if (i === 0) ctx.moveTo(x1, y1);
+                ctx.quadraticCurveTo(cpX, cpY, x2, y2);
+             }
+        };
+
+        // Pass 1: Yellow Line (Solid underlying)
+        ctx.strokeStyle = "#f1c40f";
+        tracePath();
+        ctx.stroke();
+
+        // Pass 2: Black Stripes (Dashed Overlay)
+        ctx.strokeStyle = "#2c3e50"; // Dark Blue-Black
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([8, 8]);
+        ctx.lineDashOffset = speed;
+        tracePath();
+        ctx.stroke();
+        
+        ctx.setLineDash([]);
+        ctx.restore();
+    };
+
+    // Helper to draw posts
+    const drawPost = (idx) => {
+        const c = corners[idx];
+        const cx = x + c.dx;
+        const cy = y + c.dy;
+        ctx.fillStyle = "#2c3e50";
+        ctx.fillRect(cx - 2, cy - 15, 4, 15);
+        ctx.fillStyle = "#34495e";
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, 4, 2, 0, 0, Math.PI*2);
+        ctx.fill();
+    };
+
+    // --- (Removed Foundation Slab) ---
+
+    // --- LAYER 1: Back Posts (0, 1, 3) & Back Tape ---
+    drawPost(0); drawPost(1); drawPost(3);
+    drawTape([3, 0, 1]); // Left -> Top -> Right
+
+    // --- LAYER 2: Activity (Workers or Nature) ---
+    let leader = "active";
+    if (metrics) {
+        const actP = (metrics.active?.current || 0) / (metrics.active?.max || 1);
+        const idleP = (metrics.idle?.current || 0) / (metrics.idle?.max || 1);
+        if (idleP > actP) leader = "idle";
+    }
+    
+    ctx.save();
+    
+    if (leader === 'idle') {
+        // --- NATURE RECLAIMING (Small Grass Blades) ---
+        // V-shaped blades popping up
+        const seed = (gx * 37 + gy * 13);
+        const bladeCount = 6;
+        
+        ctx.strokeStyle = "#4CAF50"; // Vivid Green
+        ctx.fillStyle = "#A5D6A7";
+        ctx.lineWidth = 2;
+        
+        for(let i=0; i<bladeCount; i++) {
+            // Pseudo-random offset in tile
+            const r1 = Math.sin(seed + i * 1.5) * 43758.5453;
+            const r2 = Math.cos(seed + i * 2.3) * 21324.32;
+            const ox = (r1 % 1) * 20 - 10;
+            const oy = (r2 % 1) * 10 - 5;
+            
+            const bx = x + ox;
+            const by = y + oy;
+            
+            // Sway animation
+            const sway = Math.sin(time * 3 + i) * 2;
+            
+            // Draw V-Shape Blade
+            //   \ /
+            //    |
+            ctx.beginPath();
+            ctx.moveTo(bx, by);
+            // Left Blade
+            ctx.quadraticCurveTo(bx - 2, by - 5, bx - 4 + sway, by - 12);
+            // Right Blade
+            ctx.moveTo(bx, by);
+            ctx.quadraticCurveTo(bx + 2, by - 5, bx + 4 + sway, by - 10);
+            ctx.stroke();
+            
+            // Small base
+            ctx.beginPath(); ctx.arc(bx, by, 1.5, 0, Math.PI*2); ctx.fill();
+        }
+        
+    } else {
+        // --- CONSTRUCTION WORKERS (NPCs) ---
+        // Use simple shapes to represent tiny workers
+        const workerCount = 2;
+        const color = leader === 'active' ? "#f1c40f" : "#e67e22"; // Yellow (Hard Hat) or Orange (Git)
+        
+        for(let i=0; i<workerCount; i++) {
+            const angle = time * 2 + (i * Math.PI); // Orbiting? or Pacing?
+            // Let's make them pace back and forth
+            const pace = Math.sin(time * 3 + i * 2) * 12;
+            const wx = x + pace * (i===0?1:-1); // Opposite directions
+            const wy = y + (i===0?-5:5); // Different depth
+            
+            // Bobbing
+            const bob = Math.abs(Math.sin(time * 10 + i)) * 3;
+            
+            // Shadow
+            ctx.fillStyle = "rgba(0,0,0,0.3)";
+            ctx.beginPath(); ctx.ellipse(wx, wy, 4, 2, 0, 0, Math.PI*2); ctx.fill();
+            
+            // Body (Blue/Grey overalls)
+            ctx.fillStyle = "#3498db"; 
+            ctx.fillRect(wx - 3, wy - 12 - bob, 6, 8);
+            
+            // Head (Hard Hat Color)
+            ctx.fillStyle = color;
+            ctx.beginPath(); ctx.arc(wx, wy - 14 - bob, 3, 0, Math.PI*2); ctx.fill();
+            
+            // Action Effect (Hammering?)
+            if (bob > 2) {
+                // Flash "Spark" or "Hit"
+                ctx.fillStyle = "#fff";
+                ctx.beginPath(); ctx.arc(wx + 5, wy - 10 - bob, 1.5, 0, Math.PI*2); ctx.fill();
+            }
+        }
+    }
+    
+    ctx.restore();
+
+    // --- LAYER 3: Front Post (2) & Front Tape ---
+    drawPost(2); 
+    drawTape([1, 2, 3]); // Right -> Bottom -> Left
+
+    // --- 5. Progress Bars (Stacked & Animated) ---
+    if (!metrics) return;
+    
+    // Sort bars by Ratio Descending (Largest to Smallest)
+    // We want the Largest at the "Back" (drawn first)
+    // The Smallest at the "Front" (drawn last)
+    
+    // Data Prep
+    const types = ['active', 'idle', 'git'];
+    const colors = { 
+        'active': ['#2ecc71', '#27ae60'], 
+        'idle':   ['#3498db', '#2980b9'], 
+        'git':    ['#e67e22', '#d35400'] 
+    };
+    const labels = { 'active': 'WORK', 'idle': 'REST', 'git': 'GIT' };
+    
+    let bars = [];
+    types.forEach(key => {
+        const m = metrics[key];
+        if (!m) return;
+        const max = m.max || 1;
+        const cur = m.current || 0;
+        const ratio = Math.min(1.0, cur / max);
+        bars.push({ key, ratio, cur, max });
+    });
+    
+    // Sort: Largest Ratio First
+    bars.sort((a, b) => b.ratio - a.ratio);
+    
+    // Dimensions
+    const barW = 50;
+    const barH = 8;
+    const baseY = y - 70; // Position ABOVE the hologram (hFrame=40 + buffer)
+    
+    // Animation spacing
+    // When Anim=0: gap=0 (all overlap)
+    // When Anim=1: gap=12 (spread out)
+    const gap = 12 * constructionHoverAnim;
+    
+    ctx.textAlign = "center";
+    ctx.font = "bold 9px Consolas, monospace";
+
+    // Draw Loop (Back to Front -> Largest to Smallest)
+    bars.forEach((bar, index) => {
+        // Calculate Y Offset
+        // We want the smallest (last index) to be at the TOP when split?
+        // OR the largest at top?
+        // User: "Highest one last layer" (Back). "Smallest one front layer".
+        // If sorting Descending: Index 0 is Largest (Back).
+        // Index 2 is Smallest (Front).
+        // If we want to verify sizes visually on overlap, Smallest MUST be Front (drawn last).
+        // Position:
+        // Overlap: All at baseY.
+        // Split: We want them to separate.
+        // Let's stack them UPWARDS. Base (Largest) stays. Others float up.
+        // Stack Upwards
+        const thisY = baseY - (index * gap); 
+        
+        // Shadow/Container (Only draw for the base/back one if merged?)
+        // If merged, we want one container.
+        // If split, each needs container.
+        // Simple hack: Draw container for ALL. 
+        // If merged, the smaller containers draw on top of larger ones? No, smaller bars are inside larger containers.
+        // Actually, if we draw container for smaller bar, it might overwrite the larger bar behind it with gray?
+        // YES. We rely on the container to be the "empty" part.
+        // But if Small (10%) is on top of Large (100%), and we draw Small Container (100% gray), it HIDES the Large Green bar.
+        // FIX: Only draw container for the FIRST (Largest) bar?
+        // OR: Container transparency?
+        // OR: Calculate container width match bar width? No, container is track (100%).
+        
+        // Correct approach for "Merged Bar":
+        // We only want ONE 100% track background.
+        // But when split, we want 3 tracks.
+        
+        // Solution: Opacity of container depends on split?
+        // OR: Only draw container loop first, then bars?
+        // If merged, we only need ONE container context.
+        
+        // Let's draw Container only if (index === 0) OR (gap > 1)
+        // If gap is small, we assume merged.
+        
+        // Actually, the user wants "3 colors in a same bar".
+        // This implies they share the background.
+        // Drawing smaller bars shouldn't draw a background that occludes the larger bar behind.
+        
+        // Logic:
+        // Draw Container Background ONLY for the largest bar (Index 0).
+        // For others, only draw container if they are separated (constructionHoverAnim > 0.1)
+        
+        if (index === 0 || constructionHoverAnim > 0.1) {
+            ctx.fillStyle = "rgba(0,0,0,0.5)"; // Shadow border
+            ctx.fillRect(x - barW/2 - 1, thisY - 1, barW + 2, barH + 2);
+            
+            ctx.fillStyle = "#2c3e50"; // Track
+            ctx.fillRect(x - barW/2, thisY, barW, barH);
+        }
+        
+        // Fill
+        if (bar.ratio > 0.001) {
+             const c = colors[bar.key];
+             const grad = ctx.createLinearGradient(0, thisY, 0, thisY + barH);
+             grad.addColorStop(0, c[0]); grad.addColorStop(1, c[1]);
+             
+             ctx.fillStyle = grad;
+             ctx.fillRect(x - barW/2, thisY, barW * bar.ratio, barH);
+             
+             // Gloss
+             ctx.fillStyle = "rgba(255,255,255,0.2)";
+             ctx.fillRect(x - barW/2, thisY, barW * bar.ratio, barH/2);
+        }
+        
+        // Text (Inside)
+        // Only show if hover > 0.2 (split enough to read)
+        if (constructionHoverAnim > 0.2) {
+            ctx.globalAlpha = constructionHoverAnim;
+            ctx.fillStyle = "#fff";
+            ctx.shadowColor = "#000"; ctx.shadowBlur = 2;
+            // Centered vertically in barH=12 -> +9 approx
+            ctx.fillText(`${labels[bar.key]} ${Math.floor(bar.cur)}`, x, thisY + 9);
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1.0;
+        }
+    });
+
 }
 
 init();

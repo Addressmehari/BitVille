@@ -131,6 +131,10 @@ class DataCollector:
         self.saver_thread.start()
         self.monitor_thread.start()
         self.github_thread.start()
+
+        # Cache for house count to avoid reading file every second
+        self.cached_house_count = 0
+        self.update_house_count()
         
         print(f"Collector started. saving to {self.filename} every minute.")
 
@@ -374,6 +378,7 @@ class DataCollector:
             json.dump(road_data, f, indent=4)
             
         print(f"City Layout Updated: {len(processed)} entities.")
+        self.cached_house_count = len(processed)
 
     def update_world_state(self):
         """Updates world.json with current time of day"""
@@ -399,6 +404,72 @@ class DataCollector:
         except Exception as e:
             print(f"Error updating world state: {e}")
 
+    def update_house_count(self):
+        """Updates the cached number of houses from file"""
+        houses_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visualizer", "stargazers_houses.json")
+        try:
+            if os.path.exists(houses_path):
+                with open(houses_path, 'r') as f:
+                    data = json.load(f)
+                    self.cached_house_count = len(data)
+        except:
+            pass
+
+    def update_construction_state(self):
+        """Updates the visualizer with the next potential building spot and progress"""
+        if not generate_city_slots: return
+
+        # 1. Calculate Next Slot
+        # If we have N houses, the next one is at index N (0-indexed) -> limit=N+1
+        next_count = self.cached_house_count + 1
+        slots, _, _ = generate_city_slots(next_count)
+        
+        if not slots: return
+        
+        next_slot = slots[-1] # The last one is the new one
+        
+        # 2. Calculate Progress
+        # We need "Existing Progress stored in file" + "Pending buffer in memory"
+        # Since 'progress_active_sec' in self is accumulative until threshold?
+        # Yes, check_rewards subtracts threshold.
+        
+        # Current 'Buffer' (self.active_seconds) is added to 'self.progress_active_sec' only on SAVE.
+        # But we want REAL TIME.
+        # So effective progress = self.progress_active_sec + self.active_seconds
+        
+        current_active = self.progress_active_sec + self.active_seconds
+        current_idle = self.progress_idle_sec + self.idle_seconds
+        # Commits are instantly updated in github_loop, so just use progress_commits
+        current_commits = self.progress_commits
+
+        state = {
+            "next_slot": {"x": next_slot[0], "y": next_slot[1]},
+            "metrics": {
+                "active": {
+                    "current": int(current_active),
+                    "max": self.THRESHOLD_HOUSE,
+                    "label": "Construction"
+                },
+                "idle": {
+                    "current": int(current_idle),
+                    "max": self.THRESHOLD_TREE,
+                    "label": "Overgrowth"
+                },
+                "git": {
+                    "current": int(current_commits),
+                    "max": GIT_POST_THRESHOLD,
+                    "label": "Git Post"
+                }
+            }
+        }
+        
+        out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visualizer", "construction_state.json")
+        try:
+            with open(out_path, 'w') as f:
+                json.dump(state, f)
+        except Exception:
+            pass
+
     def monitor_loop(self):
         """Checks idle status every second"""
         while self.running:
@@ -412,6 +483,9 @@ class DataCollector:
             # Doing it every second is overkill but harmless for check.
             # Writing only happens on change.
             self.update_world_state()
+            
+            # Update Construction State (Next Plot)
+            self.update_construction_state()
             
             time.sleep(1)
 
