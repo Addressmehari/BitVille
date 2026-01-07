@@ -193,7 +193,8 @@ class GlassApp(tk.Tk):
         if not answer:
             return
 
-        filename = "user_inputs.json"
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        filename = os.path.join(script_dir, "user_inputs.json")
         
         # Load existing data
         data = []

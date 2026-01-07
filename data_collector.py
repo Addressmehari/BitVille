@@ -125,6 +125,11 @@ class DataCollector:
         self.mouse_listener.start()
         
         # Start background threads
+        # Cache for house count to avoid reading file every second
+        self.cached_house_count = 0
+        self.update_house_count()
+
+        # Start background threads
         self.saver_thread = threading.Thread(target=self.save_loop, daemon=True)
         self.monitor_thread = threading.Thread(target=self.monitor_loop, daemon=True)
         self.github_thread = threading.Thread(target=self.github_loop, daemon=True)
@@ -132,10 +137,6 @@ class DataCollector:
         self.saver_thread.start()
         self.monitor_thread.start()
         self.github_thread.start()
-
-        # Cache for house count to avoid reading file every second
-        self.cached_house_count = 0
-        self.update_house_count()
         
         print(f"Collector started. saving to {self.filename} every minute.")
         self.ensure_next_upgrade_target()

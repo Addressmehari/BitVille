@@ -126,16 +126,27 @@ function handleNoteClick(screenX, screenY) {
 // --- Data Fetching ---
 async function fetchData() {
     try {
-        const res = await fetch('user_inputs.json?t=' + Date.now());
-        if (!res.ok) return;
-        const rawData = await res.json();
+        let rawData = [];
+        
+        // Use pywebview API if available
+        if (window.pywebview && window.pywebview.api) {
+            rawData = await window.pywebview.api.get_data();
+        } else {
+            // Fallback for standard browser/server (or if API not ready yet)
+            const res = await fetch('user_inputs.json?t=' + Date.now());
+            if (!res.ok) return;
+            rawData = await res.json();
+        }
+
         const jsonStr = JSON.stringify(rawData);
 
         if (jsonStr !== previousDataStr) {
             processNotes(rawData);
             previousDataStr = jsonStr;
         }
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+        console.error("Data fetch error:", e); 
+    }
 }
 
 function processNotes(data) {
