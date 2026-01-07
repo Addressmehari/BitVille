@@ -26,5 +26,20 @@
         "wallStyle": 0,
         "has_terrace": true,
         "facing": "left"
+    },
+    {
+        "type": "git_post",
+        "login": "Commit Node 697",
+        "x": 5.0,
+        "y": -3.0,
+        "username": "Commit Node 697",
+        "color": "#f05032",
+        "roofStyle": 1,
+        "doorStyle": 3,
+        "windowStyle": 2,
+        "chimneyStyle": 2,
+        "wallStyle": 0,
+        "has_terrace": true,
+        "facing": "left"
     }
 ]

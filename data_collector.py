@@ -18,7 +18,7 @@ import random
 
 # CONSTANTS
 GITHUB_USERNAME = "Addressmehari"
-GIT_POST_THRESHOLD = 1
+GIT_POST_THRESHOLD = 10
 
 # Allow importing from visualizer folder
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'visualizer'))
