@@ -141,9 +141,6 @@ class SettingsWindow(tk.Tk):
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
-def run_app():
+if __name__ == "__main__":
     app = SettingsWindow()
     app.mainloop()
-
-if __name__ == "__main__":
-    run_app()

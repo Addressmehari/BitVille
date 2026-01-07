@@ -110,29 +110,22 @@ class SystemTrayTracker:
         icon.stop()
         os._exit(0) # Force exit to kill threads
 
-    def launch_process(self, arg, script_name):
-        try:
-            if getattr(sys, 'frozen', False):
-                subprocess.Popen([sys.executable, arg])
-            else:
-                script_path = os.path.join(os.getcwd(), script_name)
-                subprocess.Popen([sys.executable, script_path])
-        except Exception as e:
-            print(f"Failed to launch {script_name}: {e}")
-
     def open_map(self):
-        self.launch_process('--map', 'visualizer_app.py')
+        # Open visualizer_app.py
+        script_path = os.path.join(os.getcwd(), 'visualizer_app.py')
+        subprocess.Popen([sys.executable, script_path])
 
     def open_stats(self):
-        self.launch_process('--stats', 'input_visualizer.py')
+        # Open input_visualizer.py
+        script_path = os.path.join(os.getcwd(), 'input_visualizer.py')
+        subprocess.Popen([sys.executable, script_path])
 
     def open_settings(self):
-        self.launch_process('--settings', 'settings_window.py')
+        # Open settings_window.py
+        script_path = os.path.join(os.getcwd(), 'settings_window.py')
+        subprocess.Popen([sys.executable, script_path])
 
     def run(self):
-        # Startup Launch: Glass Window
-        self.launch_process('--glass', 'home/glass_window.py')
-
         # Create the icon
         image = create_image()
         menu = pystray.Menu(
@@ -149,27 +142,5 @@ class SystemTrayTracker:
         self.icon.run()
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        mode = sys.argv[1]
-        
-        if mode == '--glass':
-            sys.path.append(os.path.join(os.getcwd(), 'home'))
-            from home.glass_window import run_app
-            run_app()
-            
-        elif mode == '--map':
-            import visualizer_app
-            visualizer_app.main()
-            
-        elif mode == '--stats':
-            import input_visualizer
-            input_visualizer.main()
-            
-        elif mode == '--settings':
-            import settings_window
-            settings_window.run_app()
-            
-    else:
-        # Mode: Tray Tracker
-        app = SystemTrayTracker()
-        app.run()
+    app = SystemTrayTracker()
+    app.run()
