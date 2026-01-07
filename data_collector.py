@@ -89,6 +89,10 @@ class DataCollector:
         self.filename = filename
         self.on_reward = on_reward
         
+        # Load Settings
+        self.settings_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'settings.json')
+        self.load_settings()
+        
         # In-memory metrics
         self.key_presses = 0
         self.mouse_clicks = 0
@@ -109,14 +113,6 @@ class DataCollector:
         self.last_total_commits = 0
         self.upgrade_target_user = None
         
-        # Thresholds (Reduced for Testing)
-        
-        # Thresholds (Reduced for Testing)
-        self.THRESHOLD_HOUSE = 300      # 300 active seconds -> 1 House (Normal)
-        self.THRESHOLD_TREE = 300       # 300 idle seconds -> 1 Tree (Normal)
-        self.THRESHOLD_UPGRADE = 1000   # 1000 keys -> 1 Upgrade
-
-
         # Start listeners
         self.keyboard_listener = keyboard.Listener(on_release=self.on_key)
         self.mouse_listener = mouse.Listener(on_click=self.on_click)
@@ -124,11 +120,10 @@ class DataCollector:
         self.keyboard_listener.start()
         self.mouse_listener.start()
         
-        # Start background threads
         # Cache for house count to avoid reading file every second
         self.cached_house_count = 0
         self.update_house_count()
-
+        
         # Start background threads
         self.saver_thread = threading.Thread(target=self.save_loop, daemon=True)
         self.monitor_thread = threading.Thread(target=self.monitor_loop, daemon=True)
@@ -140,6 +135,34 @@ class DataCollector:
         
         print(f"Collector started. saving to {self.filename} every minute.")
         self.ensure_next_upgrade_target()
+
+    def load_settings(self):
+        defaults = {
+            "github_username": "Addressmehari",
+            "git_post_threshold": 10,
+            "threshold_house": 300,
+            "threshold_tree": 300,
+            "threshold_upgrade": 1000
+        }
+        if os.path.exists(self.settings_file):
+            try:
+                with open(self.settings_file, 'r') as f:
+                    self.settings = json.load(f)
+                    # Merge defaults
+                    for k, v in defaults.items():
+                        if k not in self.settings:
+                            self.settings[k] = v
+            except:
+                self.settings = defaults
+        else:
+            self.settings = defaults
+            
+        # Apply to local vars for convenience
+        self.THRESHOLD_HOUSE = self.settings["threshold_house"]
+        self.THRESHOLD_TREE = self.settings["threshold_tree"]
+        self.THRESHOLD_UPGRADE = self.settings["threshold_upgrade"]
+        self.GIT_POST_THRESHOLD = self.settings["git_post_threshold"]
+        self.GITHUB_USERNAME = self.settings["github_username"]
 
     def on_key(self, key):
         self.key_presses += 1
@@ -303,10 +326,10 @@ class DataCollector:
                     self.upgrade_target_user = next_target.get('username')
 
         # D. Github Posts (Commits)
-        while self.progress_commits >= GIT_POST_THRESHOLD:
-            self.progress_commits -= GIT_POST_THRESHOLD
+        while self.progress_commits >= self.GIT_POST_THRESHOLD:
+            self.progress_commits -= self.GIT_POST_THRESHOLD
             print(">>> REWARD: New Git Post Created!")
-            if self.on_reward: self.on_reward("Git Post! 🐙", "5 Commits pushed! A new Git House appears.")
+            if self.on_reward: self.on_reward("Git Post! 🐙", f"{self.GIT_POST_THRESHOLD} Commits pushed! A new Git House appears.")
             
             # Find a location? (Recalculate handles it)
             # Create Git Post House
@@ -478,7 +501,7 @@ class DataCollector:
                 },
                 "git": {
                     "current": int(current_commits),
-                    "max": GIT_POST_THRESHOLD,
+                    "max": self.GIT_POST_THRESHOLD,
                     "label": "Git Post"
                 },
                 "keys": {
@@ -567,7 +590,7 @@ class DataCollector:
                     self.progress_commits = d.get('progress_commits', 0)
             except: pass
             
-        print(f"Github Monitor started. Target: {GITHUB_USERNAME}")
+        print(f"Github Monitor started. Target: {self.GITHUB_USERNAME}")
         
         # Initial Check: Create one if none exist
         houses_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visualizer", "stargazers_houses.json")
@@ -594,7 +617,7 @@ class DataCollector:
             print(f"Error checking initial git posts: {e}")
 
         while self.running:
-            current = get_github_contributions(GITHUB_USERNAME)
+            current = get_github_contributions(self.GITHUB_USERNAME)
             if current is not None:
                 print(f"[Github] Contributions: {current} (Last: {self.last_total_commits})")
                 

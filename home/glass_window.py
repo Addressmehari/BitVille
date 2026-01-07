@@ -261,6 +261,9 @@ class GlassApp(tk.Tk):
         y = self.winfo_y() + deltay
         self.geometry(f"+{x}+{y}")
 
-if __name__ == "__main__":
+def run_app():
     app = GlassApp()
     app.mainloop()
+
+if __name__ == "__main__":
+    run_app()
