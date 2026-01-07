@@ -1,4 +1,5 @@
 import tkinter as tk
+import sys
 from tkinter import ttk, messagebox
 import json
 import os
@@ -12,7 +13,11 @@ class SettingsWindow(tk.Tk):
         self.configure(bg="#1e1e24")
         
         # Paths
-        self.settings_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'settings.json')
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+        self.settings_file = os.path.join(base_path, 'settings.json')
         
         # Load Data
         self.data = self.load_data()
@@ -95,7 +100,10 @@ class SettingsWindow(tk.Tk):
             
         try:
             # Paths
-            base_dir = os.path.dirname(os.path.abspath(__file__))
+            if getattr(sys, 'frozen', False):
+                base_dir = sys._MEIPASS
+            else:
+                base_dir = os.path.dirname(os.path.abspath(__file__))
             v_dir = os.path.join(base_dir, 'visualizer')
             d_dir = os.path.join(base_dir, 'datas')
             

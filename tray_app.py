@@ -111,19 +111,36 @@ class SystemTrayTracker:
         os._exit(0) # Force exit to kill threads
 
     def open_map(self):
-        # Open visualizer_app.py
-        script_path = os.path.join(os.getcwd(), 'visualizer_app.py')
-        subprocess.Popen([sys.executable, script_path])
+        # Open visualizer_app
+        if getattr(sys, 'frozen', False):
+            subprocess.Popen([sys.executable, '--visualizer'])
+        else:
+            script_path = os.path.join(os.getcwd(), 'visualizer_app.py')
+            subprocess.Popen([sys.executable, script_path])
 
     def open_stats(self):
-        # Open input_visualizer.py
-        script_path = os.path.join(os.getcwd(), 'input_visualizer.py')
-        subprocess.Popen([sys.executable, script_path])
+        # Open input_visualizer
+        if getattr(sys, 'frozen', False):
+            subprocess.Popen([sys.executable, '--stats'])
+        else:
+            script_path = os.path.join(os.getcwd(), 'input_visualizer.py')
+            subprocess.Popen([sys.executable, script_path])
 
     def open_settings(self):
-        # Open settings_window.py
-        script_path = os.path.join(os.getcwd(), 'settings_window.py')
-        subprocess.Popen([sys.executable, script_path])
+        # Open settings_window
+        if getattr(sys, 'frozen', False):
+            subprocess.Popen([sys.executable, '--settings'])
+        else:
+            script_path = os.path.join(os.getcwd(), 'settings_window.py')
+            subprocess.Popen([sys.executable, script_path])
+
+    def open_glass(self):
+        # Open glass_window
+        if getattr(sys, 'frozen', False):
+            subprocess.Popen([sys.executable, '--glass'])
+        else:
+            script_path = os.path.join(os.getcwd(), 'home', 'glass_window.py')
+            subprocess.Popen([sys.executable, script_path])
 
     def run(self):
         # Create the icon
@@ -133,14 +150,49 @@ class SystemTrayTracker:
             pystray.MenuItem("View Map", self.open_map),
             pystray.MenuItem("View Stats", self.open_stats),
             pystray.MenuItem("Settings", self.open_settings),
+            pystray.MenuItem("Open Input", self.open_glass),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Save Now", lambda: self.collector.save_data()),
             pystray.MenuItem("Exit", self.on_quit)
         )
         
         self.icon = pystray.Icon("ActivityTracker", image, "My Tracker", menu)
+        
+        # Auto-open glass window on startup
+        # We use a timer to let the tray icon settle first? Not strictly necessary but safe.
+        threading.Timer(1.0, self.open_glass).start()
+        
         self.icon.run()
 
 if __name__ == "__main__":
-    app = SystemTrayTracker()
-    app.run()
+    if len(sys.argv) > 1:
+        if sys.argv[1] == '--visualizer':
+            import visualizer_app
+            visualizer_app.main()
+        elif sys.argv[1] == '--stats':
+            import input_visualizer
+            input_visualizer.main()
+        elif sys.argv[1] == '--settings':
+            import settings_window
+            app = settings_window.SettingsWindow()
+            app.mainloop()
+        elif sys.argv[1] == '--glass':
+            # We need to import glass_window. 
+            # It is in a subdirectory 'home'.
+            # If we are packaged, 'home' should be importable if we add it to sys.path or if it's in the bundle.
+            # PyInstaller puts root next to it.
+            if getattr(sys, 'frozen', False):
+                # In frozen, 'home' is a folder in _internal (or straight up if onefile)
+                # But imports usually start from root.
+                # Let's try appending current dir to path
+                sys.path.append(os.path.join(sys._MEIPASS, 'home'))
+                from home import glass_window
+            else:
+                 sys.path.append(os.path.join(os.getcwd(), 'home'))
+                 import glass_window
+            
+            app = glass_window.GlassApp()
+            app.mainloop()
+    else:
+        app = SystemTrayTracker()
+        app.run()

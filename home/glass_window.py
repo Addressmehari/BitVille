@@ -1,4 +1,5 @@
 import tkinter as tk
+import sys
 import ctypes
 from ctypes import windll, c_int, c_size_t, c_void_p, byref, Structure
 
@@ -193,8 +194,24 @@ class GlassApp(tk.Tk):
         if not answer:
             return
 
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        filename = os.path.join(script_dir, "user_inputs.json")
+        if getattr(sys, 'frozen', False):
+            script_dir = os.path.dirname(sys.executable)
+            # If "home" folder structure is maintained in dist/ then:
+            # But the user might want user_inputs.json in the root or 'home' subdir.
+            # Let's verify where 'user_inputs.json' normally lives. It seems to be in 'home/'.
+            # If we want it to persist, it should probably be in the root of the install or a 'data' folder.
+            # Let's put it in the same folder as the exe for simplicity, or constructing a path to 'home' if it exists.
+            
+            # Check if 'home' dir exists next to exe
+            possible_home = os.path.join(script_dir, 'home')
+            if os.path.exists(possible_home):
+                filename = os.path.join(possible_home, "user_inputs.json")
+            else:
+                # Fallback to root
+                filename = os.path.join(script_dir, "user_inputs.json")
+        else:
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            filename = os.path.join(script_dir, "user_inputs.json")
         
         # Load existing data
         data = []

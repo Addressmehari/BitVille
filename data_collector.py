@@ -20,8 +20,13 @@ import random
 GITHUB_USERNAME = "Addressmehari"
 GIT_POST_THRESHOLD = 10
 
+if getattr(sys, 'frozen', False):
+    BASE_PATH = sys._MEIPASS
+else:
+    BASE_PATH = os.path.dirname(os.path.abspath(__file__))
+
 # Allow importing from visualizer folder
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'visualizer'))
+sys.path.append(os.path.join(BASE_PATH, 'visualizer'))
 
 try:
     # Attempt to import generation logic
@@ -90,7 +95,7 @@ class DataCollector:
         self.on_reward = on_reward
         
         # Load Settings
-        self.settings_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'settings.json')
+        self.settings_file = os.path.join(BASE_PATH, 'settings.json')
         self.load_settings()
         
         # In-memory metrics
@@ -257,8 +262,8 @@ class DataCollector:
     def check_rewards(self):
         """Checks if progress counters met thresholds"""
         rewards_triggered = False
-        houses_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visualizer", "stargazers_houses.json")
-        roads_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visualizer", "roads.json")
+        houses_path = os.path.join(BASE_PATH, "visualizer", "stargazers_houses.json")
+        roads_path = os.path.join(BASE_PATH, "visualizer", "roads.json")
         
         if not os.path.exists(houses_path): return
 
@@ -425,7 +430,7 @@ class DataCollector:
 
     def update_world_state(self):
         """Updates world.json with current time of day"""
-        world_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visualizer", "world.json")
+        world_path = os.path.join(BASE_PATH, "visualizer", "world.json")
         try:
             now = datetime.now()
             hour = now.hour
@@ -449,7 +454,7 @@ class DataCollector:
 
     def update_house_count(self):
         """Updates the cached number of houses from file"""
-        houses_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visualizer", "stargazers_houses.json")
+        houses_path = os.path.join(BASE_PATH, "visualizer", "stargazers_houses.json")
         try:
             if os.path.exists(houses_path):
                 with open(houses_path, 'r') as f:
@@ -513,7 +518,7 @@ class DataCollector:
             "upgrade_target": self.upgrade_target_user
         }
         
-        out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visualizer", "construction_state.json")
+        out_path = os.path.join(BASE_PATH, "visualizer", "construction_state.json")
         try:
             with open(out_path, 'w') as f:
                 json.dump(state, f)
@@ -522,7 +527,7 @@ class DataCollector:
 
     def ensure_next_upgrade_target(self):
         """Ensures one house is targeted for the next upgrade"""
-        houses_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visualizer", "stargazers_houses.json")
+        houses_path = os.path.join(BASE_PATH, "visualizer", "stargazers_houses.json")
         if not os.path.exists(houses_path): return
 
         try:
@@ -593,7 +598,7 @@ class DataCollector:
         print(f"Github Monitor started. Target: {self.GITHUB_USERNAME}")
         
         # Initial Check: Create one if none exist
-        houses_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visualizer", "stargazers_houses.json")
+        houses_path = os.path.join(BASE_PATH, "visualizer", "stargazers_houses.json")
         try:
              with open(houses_path, 'r') as f:
                 h_data = json.load(f)
@@ -611,7 +616,7 @@ class DataCollector:
                     # Save immediately to establish base
                     # But we also need to recalculate coords.
                     # Use self.recalculate_and_save
-                    roads_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visualizer", "roads.json")
+                    roads_path = os.path.join(BASE_PATH, "visualizer", "roads.json")
                     self.recalculate_and_save(h_data, houses_path, roads_path)
         except Exception as e:
             print(f"Error checking initial git posts: {e}")

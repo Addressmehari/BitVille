@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import threading
 try:
@@ -12,7 +13,10 @@ import ctypes
 
 def main():
     # Calculate path to the HTML file
-    cpath = os.getcwd()
+    if getattr(sys, 'frozen', False):
+        cpath = sys._MEIPASS
+    else:
+        cpath = os.path.dirname(os.path.abspath(__file__))
     html_file = os.path.join(cpath, 'visualizer', 'index.html')
     
     if not os.path.exists(html_file):
