@@ -144,5 +144,27 @@
         "y": -7.0,
         "obstacle": "tree",
         "facing": "left"
+    },
+    {
+        "type": "tree",
+        "x": 9.0,
+        "y": -7.0,
+        "obstacle": "tree",
+        "facing": "left"
+    },
+    {
+        "type": "activity_house",
+        "login": "Binary Villa",
+        "x": 3.0,
+        "y": -9.0,
+        "username": "Binary Villa",
+        "color": "#4128f5",
+        "roofStyle": 0,
+        "doorStyle": 1,
+        "windowStyle": 2,
+        "chimneyStyle": 0,
+        "wallStyle": 3,
+        "has_terrace": false,
+        "facing": "left"
     }
 ]
