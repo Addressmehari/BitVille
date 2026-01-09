@@ -1,0 +1,5 @@
+pywebview
+pystray
+Pillow
+pynput
+pyinstaller

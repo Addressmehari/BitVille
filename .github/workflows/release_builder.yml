@@ -1,0 +1,58 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release Version (e.g., v1.2)"
+        required: true
+        default: "v1.0"
+      notes:
+        description: "Release Notes / Changelog"
+        required: false
+        type: string
+
+jobs:
+  build:
+    name: Build Windows EXE
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.13"
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Build Application
+        run: |
+          python autobuilder/build_app.py
+
+      - name: Identify Artifact
+        id: find_zip
+        shell: pwsh
+        run: |
+          # Find the zip file created by the build script
+          $zipFile = Get-ChildItem -Path "versions" -Filter "*.zip" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          echo "Found artifact: $($zipFile.FullName)"
+          echo "artifact_path=$($zipFile.FullName)" >> $env:GITHUB_OUTPUT
+          # Optional: Rename to include version from input
+          $newName = "GitVille-${{ inputs.version }}.zip"
+          Rename-Item -Path $zipFile.FullName -NewName $newName
+          echo "artifact_name=$newName" >> $env:GITHUB_OUTPUT
+          echo "renamed_path=$(Join-Path "versions" $newName)" >> $env:GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ inputs.version }}
+          name: Release ${{ inputs.version }}
+          body: ${{ inputs.notes }}
+          files: versions/${{ steps.find_zip.outputs.artifact_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}

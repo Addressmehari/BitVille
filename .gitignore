@@ -1137,3 +1137,4 @@ dist/GitVille/_internal/win32/win32api.pyd
 dist/GitVille/_internal/win32/win32evtlog.pyd
 dist/GitVille/_internal/win32/win32pdh.pyd
 dist/GitVille/datas/activity_log.json
+versions/version_1.zip
