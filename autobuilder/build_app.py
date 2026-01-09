@@ -47,6 +47,19 @@ def build():
         print("PyInstaller not found. Installing...")
         subprocess.run([sys.executable, '-m', 'pip', 'install', 'pyinstaller'], check=True)
 
+    # Ensure settings.json exists (PyInstaller needs it for add-data)
+    if not os.path.exists("settings.json"):
+        print("settings.json not found. Creating default for build...")
+        default_settings = """{
+    "github_username": "Addressmehari",
+    "git_post_threshold": 10,
+    "threshold_house": 300,
+    "threshold_tree": 300,
+    "threshold_upgrade": 1000
+}"""
+        with open("settings.json", "w") as f:
+            f.write(default_settings)
+            
     # PyInstaller command
     sep = ';' if os.name == 'nt' else ':'
     
@@ -130,5 +143,6 @@ if __name__ == "__main__":
         
     except Exception as e:
         print(f"\nCRITICAL ERROR: {e}")
+        sys.exit(1)
         
     input("\nPress Enter to exit...")
