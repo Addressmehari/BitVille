@@ -50,8 +50,10 @@ jobs:
 
       - name: Generate Release Body
         shell: pwsh
+        env:
+          RELEASE_NOTES: ${{ inputs.notes }}
         run: |
-          $notes = "${{ inputs.notes }}"
+          $notes = $env:RELEASE_NOTES
           $features = @"
 
           ## Features
