@@ -210,8 +210,35 @@ def generate_city(username="User"):
     entities.append({ "type": "owner", "login": username })
     
     # B. Activity Houses
+    # B. Activity Houses
+    # Cyberpunk / Sci-Fi Name Generator
+    sci_fi_formats = [
+        "Sector-{code}",
+        "Unit {code}",
+        "{concept} Outpost",
+        "{concept} Station",
+        "{concept} Node",
+        "Block {num}",
+        "Zone {code}"
+    ]
+    
+    concepts = ["Alpha", "Beta", "Gamma", "Delta", "Nexus", "Zero", "Void", "Flux", "Core", "Neon", "Cyber", "Null", "Stack", "Heap", "Root"]
+    
     for i in range(activity_houses_count):
-        entities.append({ "type": "activity_house", "login": f"Active_Session_{i+1}" })
+        # Pick format
+        fmt = sci_fi_formats[i % len(sci_fi_formats)]
+        
+        # Data
+        code = f"{random.choice(['A','B','X','Z','7','9'])}-{random.randint(10,99)}"
+        num = random.randint(1, 999)
+        concept = concepts[i % len(concepts)]
+        
+        name = fmt.format(code=code, num=num, concept=concept)
+        
+        # Add slight variation if duplicate index logic creates collision?
+        # The simple modulo above cycles.
+        
+        entities.append({ "type": "activity_house", "login": name })
         
     # C. Activity Trees
     for _ in range(activity_trees_count):

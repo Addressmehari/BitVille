@@ -838,6 +838,13 @@ function renderHouses() {
             drawConstructionSite(house.x, house.y, house.metrics);
         } else if (house.obstacle === 'tree') {
             drawTree(house.x, house.y, ctx);
+        } else if (house.type === 'git_foundation' || house.username === 'Git Foundation') {
+            // New Foundation Style
+             if (typeof drawGitFoundation !== 'undefined') {
+                drawGitFoundation(house.x, house.y, house.hoverAnim, house.username, house.facing);
+             } else {
+                 drawHouse(house.x, house.y, house.color, house.roofStyle, house.doorStyle, house.windowStyle, house.chimneyStyle, house.wallStyle, house.hoverAnim, house.username, house.abandoned, house.facing, house.has_terrace, house.is_upgrade_target);
+             }
         } else if (house.type === 'git_post') {
             // Check if drawGitHouse exists, fall back to drawHouse if not
              if (typeof drawGitHouse !== 'undefined') {
@@ -2892,6 +2899,214 @@ function adjustColor(color, amount) {
 }
 
 // Start
+
+function drawGitFoundation(gx, gy, hoverAnim, username, facing) {
+    const time = performance.now() * 0.002;
+    const isoCenter = gridToWorld(gx, gy);
+    // Lift Logic
+    const lift = (hoverAnim || 0) * 4;
+    function toScreen(lx, ly, lz) {
+        if (facing === 'right') { const t = lx; lx = ly; ly = t; }
+        const sx = isoCenter.x + (lx - ly);
+        const sy = isoCenter.y + (lx + ly) * 0.5 - lz - lift;
+        return { x: sx, y: sy };
+    }
+
+    // --- 1. The Pedestal (Stone Base) ---
+    // Tiered base like a monument
+    const tiers = 3;
+    const baseW = 20; 
+    const stepH = 4;
+    
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(0,0,0,0.2)";
+
+    for(let i=0; i<tiers; i++) {
+        // Tapering up
+        const w = baseW - (i * 3);  // 20, 17, 14
+        const d = baseW - (i * 3);
+        const z = i * stepH;
+        
+        const col = (i%2===0) ? "#95a5a6" : "#7f8c8d"; // Alternating stone grey
+        
+        const p_bl = toScreen(-w, d, z);
+        const p_br = toScreen(w, d, z);
+        const p_tr = toScreen(w, -d, z);
+        const p_tl = toScreen(-w, -d, z); // Top face TL, needed for top surface
+        
+        const p_t_bl = toScreen(-w, d, z+stepH);
+        const p_t_br = toScreen(w, d, z+stepH);
+        const p_t_tr = toScreen(w, -d, z+stepH);
+        const p_t_tl = toScreen(-w, -d, z+stepH);
+
+        // Front Face
+        ctx.fillStyle = adjustColor(col, -10);
+        ctx.beginPath(); ctx.moveTo(p_bl.x, p_bl.y); ctx.lineTo(p_br.x, p_br.y); ctx.lineTo(p_t_br.x, p_t_br.y); ctx.lineTo(p_t_bl.x, p_t_bl.y); ctx.fill(); ctx.stroke();
+        // Right Face
+        ctx.fillStyle = adjustColor(col, -20);
+        ctx.beginPath(); ctx.moveTo(p_br.x, p_br.y); ctx.lineTo(p_tr.x, p_tr.y); ctx.lineTo(p_t_tr.x, p_t_tr.y); ctx.lineTo(p_t_br.x, p_t_br.y); ctx.fill(); ctx.stroke();
+        // Top Face
+        ctx.fillStyle = col;
+        ctx.beginPath(); ctx.moveTo(p_t_bl.x, p_t_bl.y); ctx.lineTo(p_t_br.x, p_t_br.y); ctx.lineTo(p_t_tr.x, p_t_tr.y); ctx.lineTo(p_t_tl.x, p_t_tl.y); ctx.fill(); ctx.stroke();
+    }
+    
+    // Pillar logic
+    const pillW = 8;
+    const pillH = 12;
+    const pillBaseZ = tiers * stepH;
+    
+    // Pillar Draw
+    const pil_bl = toScreen(-pillW, pillW, pillBaseZ);
+    const pil_br = toScreen(pillW, pillW, pillBaseZ);
+    const pil_tr = toScreen(pillW, -pillW, pillBaseZ);
+    
+    const pil_t_bl = toScreen(-pillW, pillW, pillBaseZ+pillH);
+    const pil_t_br = toScreen(pillW, pillW, pillBaseZ+pillH);
+    const pil_t_tr = toScreen(pillW, -pillW, pillBaseZ+pillH);
+    const pil_t_tl = toScreen(-pillW, -pillW, pillBaseZ+pillH);
+    
+    ctx.fillStyle = "#bdc3c7"; // Lighter stone
+    // Front
+    ctx.beginPath(); ctx.moveTo(pil_bl.x, pil_bl.y); ctx.lineTo(pil_br.x, pil_br.y); ctx.lineTo(pil_t_br.x, pil_t_br.y); ctx.lineTo(pil_t_bl.x, pil_t_bl.y); ctx.fill(); ctx.stroke();
+    // Right
+    ctx.fillStyle = "#aab7b8";
+    ctx.beginPath(); ctx.moveTo(pil_br.x, pil_br.y); ctx.lineTo(pil_tr.x, pil_tr.y); ctx.lineTo(pil_t_tr.x, pil_t_tr.y); ctx.lineTo(pil_t_br.x, pil_t_br.y); ctx.fill(); ctx.stroke();
+    // Top
+    ctx.fillStyle = "#ecf0f1";
+    ctx.beginPath(); ctx.moveTo(pil_t_bl.x, pil_t_bl.y); ctx.lineTo(pil_t_br.x, pil_t_br.y); ctx.lineTo(pil_t_tr.x, pil_t_tr.y); ctx.lineTo(pil_t_tl.x, pil_t_tl.y); ctx.fill(); ctx.stroke();
+    
+    // Plaque on Pillar
+    const plaW = 4; const plaH = 6;
+    const plaY = pillW + 0.5; // Slightly forward
+    const plaZ = pillBaseZ + 3;
+    const pl_bl = toScreen(-plaW, plaY, plaZ);
+    const pl_tr = toScreen(plaW, plaY, plaZ+plaH);
+    const pl_br = toScreen(plaW, plaY, plaZ);
+    const pl_tl = toScreen(-plaW, plaY, plaZ+plaH);
+    
+    ctx.fillStyle = "#f1c40f"; // Gold Plaque
+    ctx.beginPath(); ctx.moveTo(pl_bl.x, pl_bl.y); ctx.lineTo(pl_br.x, pl_br.y); ctx.lineTo(pl_tr.x, pl_tr.y); ctx.lineTo(pl_tl.x, pl_tl.y); ctx.fill();
+
+
+    // --- 2. The Statue (Floating Diamond) ---
+    // A giant regular octahedron (Diamond shape)
+    // Floating animation
+    const float = Math.sin(time) * 3;
+    const statueBaseZ = pillBaseZ + pillH + 8 + float;
+    
+    // Diamond Specs
+    const rad = 14; 
+    
+    // Vertices relative to center (0,0, statueBaseZ + rad)
+    const cenZ = statueBaseZ + rad;
+    
+    // Top and Bottom tips
+    const vTop = toScreen(0, 0, cenZ + rad);
+    const vBot = toScreen(0, 0, cenZ - rad);
+    
+    // Mid Belt (Rotated 45 degrees or straight?)
+    // Rotating animation:
+    const rotSpeed = time * 0.5;
+    const v1 = toScreen(Math.sin(rotSpeed)*rad, Math.cos(rotSpeed)*rad, cenZ);
+    const v2 = toScreen(Math.sin(rotSpeed + Math.PI/2)*rad, Math.cos(rotSpeed + Math.PI/2)*rad, cenZ);
+    const v3 = toScreen(Math.sin(rotSpeed + Math.PI)*rad, Math.cos(rotSpeed + Math.PI)*rad, cenZ);
+    const v4 = toScreen(Math.sin(rotSpeed + 3*Math.PI/2)*rad, Math.cos(rotSpeed + 3*Math.PI/2)*rad, cenZ);
+    
+    // Draw Faces - simple Painter's algo isn't perfect for transparency but fine for solid
+    // We just need to draw back faces then front.
+    // Determining back faces simply: those with higher Y/screen depth?
+    // Let's just draw all with a specific order or simply draw sorted by distance?
+    // Simplified: Draw Back halves, then Front halves.
+    // "Back" is 1-2-3-4? 
+    // Actually, just draw all 8 faces.
+    // The "Back" faces are the ones "behind" the center in screen space?
+    // Or just make it slightly translucent crystal?
+    
+    // Crystal Style:
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineJoin = "round";
+    
+    // Faces
+    const faces = [
+        [vTop, v1, v2], [vTop, v2, v3], [vTop, v3, v4], [vTop, v4, v1], // Top Pyramid
+        [vBot, v1, v2], [vBot, v2, v3], [vBot, v3, v4], [vBot, v4, v1]  // Bottom Pyramid
+    ];
+    
+    // Sort faces by Z-depth of centroid? 
+    // Screen Y is a good approximation for depth in iso (lower Y = further back usually? No, higher Y is closer).
+    // Let's rely on simple transparency blending or specific colors.
+    // Solid Gold Statue.
+    // We need to cull back faces for solid look or sort them.
+    // Quick Sort: Average Y of vertices. Smallest Y is furthest back (Top of screen).
+    
+    faces.sort((a,b) => {
+        const ay = (a[0].y + a[1].y + a[2].y)/3;
+        const by = (b[0].y + b[1].y + b[2].y)/3;
+        return ay - by; // Draw small Y (Back) first
+    });
+    
+    faces.forEach((f, i) => {
+        // Lighting: Simple directional
+        // Normal vector calculation is heavy. 
+        // Fake it with index or random variation?
+        // Let's make it Gold.
+        
+        ctx.beginPath();
+        ctx.moveTo(f[0].x, f[0].y);
+        ctx.lineTo(f[1].x, f[1].y);
+        ctx.lineTo(f[2].x, f[2].y);
+        ctx.closePath();
+        
+        // Color variance for facets
+        // Use the face index or vertex position to pick shade
+        const shade = 10 + (Math.sin(i * 13 + rotSpeed*2) * 20); // Shimmering
+        // Base Gold: #f1c40f (RGB: 241, 196, 15)
+        const col = adjustColor("#f1c40f", shade);
+        
+        ctx.fillStyle = col;
+        ctx.fill();
+        ctx.stroke();
+    });
+    
+    // Glow Effect
+    const centerSc = toScreen(0,0,cenZ);
+    const pulse = Math.sin(time*3) * 0.5 + 0.8;
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    const grad = ctx.createRadialGradient(centerSc.x, centerSc.y, 1, centerSc.x, centerSc.y, 40 * pulse);
+    grad.addColorStop(0, "rgba(255, 255, 255, 0.8)"); // Bright center
+    grad.addColorStop(0.4, "rgba(241, 196, 15, 0.4)"); // Gold mid
+    grad.addColorStop(1, "rgba(241, 196, 15, 0)"); // Fade out
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(centerSc.x, centerSc.y, 50, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+
+
+    // --- Tooltip ---
+    if (username && hoverAnim > 0.05) {
+         ctx.save();
+         const tipX = vTop.x;
+         const tipY = vTop.y - 15;
+         ctx.translate(tipX, tipY);
+         ctx.scale(hoverAnim, hoverAnim);
+         
+         ctx.font = "bold 12px 'Segoe UI', serif";
+         const txt = "The Foundation";
+         const w = ctx.measureText(txt).width + 16;
+         
+         ctx.fillStyle = "rgba(44, 62, 80, 0.9)"; // Dark Slate
+         ctx.strokeStyle = "#f39c12"; // Gold border
+         ctx.lineWidth = 1.5;
+         
+         ctx.beginPath(); ctx.roundRect(-w/2, -30, w, 24, 4); ctx.fill(); ctx.stroke();
+         ctx.fillStyle = "#fff";
+         ctx.textAlign = "center";
+         ctx.fillText(txt, 0, -14);
+         
+         ctx.restore();
+    }
+}
 
 function drawGitHouse(gx, gy, hoverAnim, username, facing) {
     const time = performance.now() * 0.002; // Global time for animation
