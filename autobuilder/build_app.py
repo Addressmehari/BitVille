@@ -145,4 +145,5 @@ if __name__ == "__main__":
         print(f"\nCRITICAL ERROR: {e}")
         sys.exit(1)
         
-    input("\nPress Enter to exit...")
+    if sys.stdin.isatty():
+        input("\nPress Enter to exit...")
