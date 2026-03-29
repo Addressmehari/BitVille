@@ -6,6 +6,8 @@ Every keystroke, mouse click, and commit helps your city grow!
 
 > **Note**: This project is derived from [GitVille](https://github.com/Addressmehari/GitVille) by Addressmehari.
 
+
+
 ## 🏙️ What is BitVille?
 
 BitVille runs in the background and tracks your activity to reward you with city elements:
