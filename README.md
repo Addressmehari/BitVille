@@ -77,11 +77,12 @@ You can change the difficulty and settings via the **Settings -> Settings** menu
 
 ## 🛠️ Technology Stack
 
-- **Python**: Backend logic, threading, and system integration.
-- **PyWebview**: Wraps the HTML/JS visualizers into native-like windows.
-- **HTML5 Canvas & JavaScript**: Renders the high-performance isometric city.
-- **Pynput**: Low-level input monitoring.
-
+| Technology            | Purpose                                      |
+|----------------------|----------------------------------------------|
+| Python               | Backend logic, threading, system integration |
+| PyWebview            | Wraps web UI into desktop window             |
+| HTML5 Canvas + JS    | Renders isometric visuals                    |
+| Pynput               | Tracks keyboard and mouse input              |
 ---
 
 ## 📸 Gallery
